@@ -1066,7 +1066,7 @@ function renderTreeNode(node, query) {
     button.draggable = true;
     button.dataset.path = node.path;
     button.dataset.type = node.type;
-    button.innerHTML = `<span aria-hidden="true">${node.type === "note" ? "•" : "◦"}</span><span class="tree-label">${escapeHtml(label)}</span>`;
+    button.innerHTML = `<span class="tree-kind-icon" aria-hidden="true">${node.type === "note" ? "◆" : "▧"}</span><span class="tree-label">${escapeHtml(label)}</span>`;
     button.addEventListener("click", () => {
       if (node.type === "note") openNote(node.path);
       else selectEntry(node.path, "asset");
@@ -1098,7 +1098,7 @@ function renderTreeNode(node, query) {
   const label = document.createElement("button");
   label.className = "tree-label-button";
   label.type = "button";
-  label.innerHTML = `<span class="tree-label">${escapeHtml(node.name)}</span>`;
+  label.innerHTML = `<span class="tree-kind-icon tree-folder-icon" aria-hidden="true">▣</span><span class="tree-label">${escapeHtml(node.name)}</span>`;
   label.addEventListener("click", () => selectEntry(node.path, "folder"));
 
   header.append(toggle, label);
