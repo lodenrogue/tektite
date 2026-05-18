@@ -62,6 +62,15 @@ npm run package:linux
 
 The package scripts use the `electron-packager` CLI provided by `@electron/packager`. Install dependencies first with `npm install`.
 
+## Homebrew
+
+```sh
+brew tap mathiasconradt/tektite https://github.com/mathiasconradt/tektite
+brew install --cask tektite
+```
+
+The cask installs the macOS release asset from GitHub Releases.
+
 ## Author
 
 Tektite was created by Mathias Conradt.

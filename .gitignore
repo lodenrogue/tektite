@@ -16,6 +16,7 @@ Tektite-darwin-*/
 Tektite-linux-*/
 Tektite-mas-*/
 Tektite-win32-*/
+Tektite-macOS-*.zip
 
 # macOS / editor noise
 .DS_Store
