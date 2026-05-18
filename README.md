@@ -71,6 +71,8 @@ brew install --cask tektite
 
 The cask installs the macOS release asset from GitHub Releases.
 
+Patch releases are created automatically for app changes on `main`. The version bump workflow updates `package.json`, `package-lock.json`, and the Homebrew cask, then pushes a matching `vX.Y.Z` tag. The macOS build workflow publishes that tag as a GitHub Release with the app zip attached.
+
 ## Author
 
 Tektite was created by Mathias Conradt.

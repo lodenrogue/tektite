@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Detect app changes
         id: changes
@@ -61,9 +62,14 @@ jobs:
           ruby -0pi -e "gsub(/version \"[^\"]+\"/, 'version \"' + '${version}' + '\"')" Casks/tektite.rb
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      - name: Commit version bump
+      - name: Commit version bump and tag release
         if: steps.changes.outputs.app_changed == 'true'
-        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403
-        with:
-          commit_message: "chore: bump version to ${{ steps.version.outputs.version }}"
-          file_pattern: package.json package-lock.json Casks/tektite.rb
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json Casks/tektite.rb
+          git commit -m "chore: bump version to ${version}"
+          git tag "v${version}"
+          git push origin HEAD:main
+          git push origin "v${version}"
