@@ -4,14 +4,13 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   bump:
     name: Bump patch version for app changes
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       app_changed: ${{ steps.changes.outputs.app_changed }}
       version: ${{ steps.version.outputs.version }}
@@ -82,6 +81,8 @@ jobs:
     needs: bump
     if: needs.bump.outputs.app_changed == 'true'
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout release tag
