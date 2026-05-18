@@ -82,7 +82,7 @@
       </section>
     </main>
     <script>
-      const version = new URLSearchParams(window.location.search).get("version");
+      const version = new URLSearchParams(globalThis.location.search).get("version");
       if (version) document.getElementById("version").textContent = version;
     </script>
   </body>

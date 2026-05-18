@@ -46,7 +46,7 @@ const state = {
   }
 };
 
-const verbose = new URLSearchParams(window.location.search).has("debug") ||
+const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
   localStorage.getItem("tektite:verbose") === "1";
 
 function log(...args) {
@@ -131,23 +131,23 @@ function boot() {
   els.nameDialog.addEventListener("click", (event) => {
     if (event.target === els.nameDialog) closeNameDialog(null);
   });
-  window.addEventListener("keydown", (event) => {
+  globalThis.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeTreeContextMenu();
     if (event.key === "Escape" && !els.nameDialog.classList.contains("hidden")) {
       closeNameDialog(null);
     }
   });
-  window.addEventListener("click", (event) => {
+  globalThis.addEventListener("click", (event) => {
     if (!event.target.closest?.("#treeContextMenu")) closeTreeContextMenu();
   });
-  window.addEventListener("resize", () => {
+  globalThis.addEventListener("resize", () => {
     applyLayout();
     updateGraph();
   });
 
-  window.tektite.onOpenVault(chooseVault);
-  window.tektite.onOpenRecentVault(openVault);
-  window.tektite.onNewNote(createNote);
+  globalThis.tektite.onOpenVault(chooseVault);
+  globalThis.tektite.onOpenRecentVault(openVault);
+  globalThis.tektite.onNewNote(createNote);
 
   const lastVault = localStorage.getItem("tektite:lastVault");
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
@@ -175,7 +175,7 @@ function saveLayout() {
 }
 
 function applyLayout() {
-  const windowWidth = window.innerWidth || 1200;
+  const windowWidth = globalThis.innerWidth || 1200;
   const maxSidebar = Math.max(220, Math.min(620, windowWidth - 720));
   state.layout.sidebarWidth = clamp(state.layout.sidebarWidth, 220, maxSidebar);
   state.layout.editorRatio = clamp(state.layout.editorRatio, 0.28, 0.78);
@@ -206,9 +206,9 @@ function startResize(event, target) {
 
   event.currentTarget.setPointerCapture(event.pointerId);
   document.body.classList.add(target === "sidebarGraph" ? "resizing-y" : "resizing");
-  window.addEventListener("pointermove", onResizeMove);
-  window.addEventListener("pointerup", stopResize, { once: true });
-  window.addEventListener("pointercancel", stopResize, { once: true });
+  globalThis.addEventListener("pointermove", onResizeMove);
+  globalThis.addEventListener("pointerup", stopResize, { once: true });
+  globalThis.addEventListener("pointercancel", stopResize, { once: true });
 }
 
 function onResizeMove(event) {
@@ -217,7 +217,7 @@ function onResizeMove(event) {
 
   if (resize.target === "sidebar") {
     const nextWidth = resize.startSidebarWidth + event.clientX - resize.startX;
-    const maxSidebar = Math.max(220, Math.min(620, window.innerWidth - 720));
+    const maxSidebar = Math.max(220, Math.min(620, globalThis.innerWidth - 720));
     state.layout.sidebarWidth = clamp(nextWidth, 220, maxSidebar);
   } else if (resize.target === "editor") {
     const x = event.clientX - resize.workspaceLeft;
@@ -235,10 +235,9 @@ function onResizeMove(event) {
 function stopResize() {
   if (!state.activeResize) return;
   state.activeResize = null;
-  document.body.classList.remove("resizing");
-  document.body.classList.remove("resizing-y");
-  window.removeEventListener("pointermove", onResizeMove);
-  window.removeEventListener("pointercancel", stopResize);
+  document.body.classList.remove("resizing", "resizing-y");
+  globalThis.removeEventListener("pointermove", onResizeMove);
+  globalThis.removeEventListener("pointercancel", stopResize);
   saveLayout();
 }
 
@@ -275,7 +274,7 @@ function updateSuffixButton() {
 
 async function chooseVault() {
   log("chooseVault start");
-  const rootPath = await window.tektite.chooseVault();
+  const rootPath = await globalThis.tektite.chooseVault();
   if (!rootPath) return;
   await openVault(rootPath);
 }
@@ -284,7 +283,7 @@ async function openVault(rootPath) {
   log("openVault start", rootPath);
   setSaveState("Opening...");
   try {
-    const vault = await window.tektite.scanVault(rootPath);
+    const vault = await globalThis.tektite.scanVault(rootPath);
     log("openVault scan complete", { notes: vault.notes.length });
     state.rootPath = vault.rootPath;
     state.tree = vault.tree;
@@ -329,7 +328,7 @@ async function refreshVault() {
   const selectedPath = state.selectedPath;
   const selectedType = state.selectedType;
   await flushActiveNote();
-  const vault = await window.tektite.scanVault(state.rootPath);
+  const vault = await globalThis.tektite.scanVault(state.rootPath);
   state.tree = vault.tree;
   state.notes = vault.notes;
   indexNotes();
@@ -366,7 +365,7 @@ async function createNote(context = currentSelection()) {
 
   const folder = folderForContext(context);
   try {
-    const newPath = await window.tektite.createNote(state.rootPath, requestedName, folder);
+    const newPath = await globalThis.tektite.createNote(state.rootPath, requestedName, folder);
     await refreshVault();
     await openNote(newPath);
     log("createNote complete", newPath);
@@ -390,7 +389,7 @@ async function createFolder(context = currentSelection()) {
   }
 
   try {
-    const newPath = await window.tektite.createFolder(state.rootPath, requestedName, folderForContext(context));
+    const newPath = await globalThis.tektite.createFolder(state.rootPath, requestedName, folderForContext(context));
     state.collapsedFolders.delete(parentFolder(newPath));
     await refreshVault();
     log("createFolder complete", newPath);
@@ -409,11 +408,11 @@ async function deleteSelectedEntry(context = currentSelection()) {
   const message = selection.type === "folder"
     ? `Delete folder "${label}" and everything inside it?`
     : `Delete file "${label}"?`;
-  if (!window.confirm(message)) return;
+  if (!globalThis.confirm(message)) return;
 
   try {
     clearTimeout(state.saveTimer);
-    await window.tektite.deleteEntry(state.rootPath, selection.path, selection.type);
+    await globalThis.tektite.deleteEntry(state.rootPath, selection.path, selection.type);
     if (selection.path === state.activePath || isPathInside(state.activePath, selection.path)) {
       showEmptyState("Select or create a note.");
     }
@@ -442,26 +441,41 @@ async function renameSelectedEntry(context = currentSelection()) {
   try {
     if (state.activePath) await saveActiveNote();
     clearTimeout(state.saveTimer);
-    const newPath = await window.tektite.renameEntry(state.rootPath, context.path, context.type, requestedName);
+    const newPath = await globalThis.tektite.renameEntry(state.rootPath, context.path, context.type, requestedName);
     const previousActivePath = state.activePath;
     await refreshVault();
 
-    if (context.type === "note" && previousActivePath === context.path) {
-      await openNote(newPath);
-    } else if (context.type === "asset" && previousActivePath === context.path) {
-      await openAsset(newPath);
-    } else if (context.type === "folder" && isPathInside(previousActivePath, context.path)) {
-      const movedActivePath = pathAfterMove(previousActivePath, context.path, newPath);
-      if (movedActivePath && state.noteByPath.has(movedActivePath)) await openNote(movedActivePath);
-      else if (movedActivePath && treeEntryExists(state.tree, movedActivePath, "asset")) await openAsset(movedActivePath);
-    } else {
-      if (context.type !== "folder") selectEntry(newPath, context.type);
-    }
+    await reopenRenamedEntry(context, previousActivePath, newPath);
     setSaveState("Renamed");
   } catch (error) {
     console.error("[tektite:renderer] renameSelectedEntry failed", error);
     setSaveState("Failed");
   }
+}
+
+async function reopenRenamedEntry(context, previousActivePath, newPath) {
+  if (context.type === "note" && previousActivePath === context.path) {
+    await openNote(newPath);
+    return;
+  }
+  if (context.type === "asset" && previousActivePath === context.path) {
+    await openAsset(newPath);
+    return;
+  }
+  if (context.type === "folder" && isPathInside(previousActivePath, context.path)) {
+    await openMovedActiveEntry(pathAfterMove(previousActivePath, context.path, newPath));
+    return;
+  }
+  if (context.type !== "folder") selectEntry(newPath, context.type);
+}
+
+async function openMovedActiveEntry(path) {
+  if (!path) return;
+  if (state.noteByPath.has(path)) {
+    await openNote(path);
+    return;
+  }
+  if (treeEntryExists(state.tree, path, "asset")) await openAsset(path);
 }
 
 function openNameDialog({ title, defaultName, confirmLabel = "Create" }) {
@@ -470,6 +484,7 @@ function openNameDialog({ title, defaultName, confirmLabel = "Create" }) {
     els.nameDialogTitle.textContent = title;
     els.confirmNameButton.textContent = confirmLabel;
     els.nameInput.value = defaultName;
+    els.nameDialog.setAttribute("open", "");
     els.nameDialog.classList.remove("hidden");
     requestAnimationFrame(() => {
       els.nameInput.focus();
@@ -487,6 +502,7 @@ function onNameSubmit(event) {
 function closeNameDialog(value) {
   if (!state.nameDialogResolve) return;
   els.nameDialog.classList.add("hidden");
+  els.nameDialog.removeAttribute("open");
   const resolve = state.nameDialogResolve;
   state.nameDialogResolve = null;
   resolve(value);
@@ -607,9 +623,9 @@ async function onEditorDrop(event) {
   try {
     const imported = [];
     for (const file of images) {
-      const sourcePath = window.tektite.getFilePath(file);
+      const sourcePath = globalThis.tektite.getFilePath(file);
       if (!sourcePath) continue;
-      imported.push(await window.tektite.importImage(state.rootPath, sourcePath, activeFolder()));
+      imported.push(await globalThis.tektite.importImage(state.rootPath, sourcePath, activeFolder()));
     }
     if (!imported.length) return;
 
@@ -680,9 +696,9 @@ async function onTreeDrop(event) {
 
   try {
     for (const file of images) {
-      const sourcePath = window.tektite.getFilePath(file);
+      const sourcePath = globalThis.tektite.getFilePath(file);
       if (!sourcePath) continue;
-      await window.tektite.importImage(state.rootPath, sourcePath, targetFolderPath);
+      await globalThis.tektite.importImage(state.rootPath, sourcePath, targetFolderPath);
     }
     state.collapsedFolders.delete(targetFolderPath);
     await refreshVault();
@@ -706,31 +722,47 @@ function onTreeDragStart(event) {
 
 async function moveTreeEntry(payload, targetFolderPath) {
   try {
-    if (!payload.path || payload.path === targetFolderPath) return;
-    if (payload.type === "folder" && targetFolderPath.startsWith(`${payload.path}/`)) return;
+    if (!canMoveTreeEntry(payload, targetFolderPath)) return;
     const originalActivePath = state.activePath;
-    const nextPath = await window.tektite.moveEntry(state.rootPath, payload.path, payload.type, targetFolderPath);
-    if (payload.path === originalActivePath) {
-      state.activePath = nextPath;
-    } else if (payload.type === "folder" && isPathInside(originalActivePath, payload.path)) {
-      state.activePath = `${nextPath}${originalActivePath.slice(payload.path.length)}`;
-    }
-    if (state.selectedPath === payload.path) {
-      state.selectedPath = payload.type === "folder" ? "" : nextPath;
-      state.selectedType = payload.type === "folder" ? "folder" : payload.type;
-    }
+    const nextPath = await globalThis.tektite.moveEntry(state.rootPath, payload.path, payload.type, targetFolderPath);
+    updateMovedEntryState(payload, nextPath, originalActivePath);
     state.collapsedFolders.delete(targetFolderPath);
     await refreshVault();
-    if (state.activePath && state.noteByPath.has(state.activePath)) await openNote(state.activePath);
-    else if (state.activePath && treeEntryExists(state.tree, state.activePath, "asset")) await openAsset(state.activePath);
-    else if (payload.type === "note") await openNote(nextPath);
-    else if (payload.type === "asset") await openAsset(nextPath);
-    else if (payload.type !== "folder") selectEntry(nextPath, payload.type);
+    await reopenMovedTreeEntry(payload, nextPath);
     setSaveState("Moved");
   } catch (error) {
     console.error("[tektite:renderer] moveTreeEntry failed", error);
     setSaveState("Failed");
   }
+}
+
+function canMoveTreeEntry(payload, targetFolderPath) {
+  if (!payload.path || payload.path === targetFolderPath) return false;
+  return payload.type !== "folder" || !targetFolderPath.startsWith(`${payload.path}/`);
+}
+
+function updateMovedEntryState(payload, nextPath, originalActivePath) {
+  if (payload.path === originalActivePath) {
+    state.activePath = nextPath;
+  } else if (payload.type === "folder" && isPathInside(originalActivePath, payload.path)) {
+    state.activePath = `${nextPath}${originalActivePath.slice(payload.path.length)}`;
+  }
+
+  if (state.selectedPath !== payload.path) return;
+  state.selectedPath = payload.type === "folder" ? "" : nextPath;
+  state.selectedType = payload.type === "folder" ? "folder" : payload.type;
+}
+
+async function reopenMovedTreeEntry(payload, nextPath) {
+  if (state.activePath) {
+    await openMovedActiveEntry(state.activePath);
+    if (entryExists(state.activePath, state.activeType)) return;
+  }
+  if (payload.type === "note") {
+    await openNote(nextPath);
+    return;
+  }
+  if (payload.type === "asset") await openAsset(nextPath);
 }
 
 function pathAfterMove(originalPath, oldBasePath, newBasePath) {
@@ -776,20 +808,21 @@ function relativeMarkdownLink(sourcePath, targetPath) {
   const sourceFolder = parentFolder(sourcePath);
   const relative = relativePath(sourceFolder, targetPath);
   const normalized = relative.startsWith(".") ? relative : `./${relative}`;
-  return encodeURI(normalized).replace(/%5B/g, "[").replace(/%5D/g, "]");
+  return encodeURI(normalized).replaceAll("%5B", "[").replaceAll("%5D", "]");
 }
 
 function localImageUrl(target, sourcePath = "") {
   const decoded = decodeLink(target);
   if (/^[a-z]+:\/\//i.test(decoded)) return null;
-  const clean = decoded.replace(/#.*$/, "").trim();
+  const clean = decoded.replace(/#.*$/u, "").trim();
   const extension = clean.split(".").pop()?.toLowerCase();
   if (!["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"].includes(extension)) return null;
 
   const sourceFolder = parentFolder(sourcePath);
   const relative = normalizeVaultPath(sourceFolder ? `${sourceFolder}/${clean}` : clean);
   if (!relative || !state.rootPath) return null;
-  return `file://${encodeURI(`${state.rootPath}/${relative}`)}`;
+  const absolutePath = `${state.rootPath}/${relative}`;
+  return `file://${encodeURI(absolutePath)}`;
 }
 
 function relativePath(fromFolder, toPath) {
@@ -799,7 +832,7 @@ function relativePath(fromFolder, toPath) {
     fromParts.shift();
     toParts.shift();
   }
-  return [...fromParts.map(() => ".."), ...toParts].join("/") || `./${toPath.split("/").pop()}`;
+  return [...fromParts.map(() => ".."), ...toParts].join("/") || `./${toPath.split("/").at(-1)}`;
 }
 
 function getTextareaCaretPosition(textarea, position) {
@@ -840,7 +873,7 @@ function getTextareaCaretPosition(textarea, position) {
   div.style.position = "fixed";
   div.style.visibility = "hidden";
   div.style.whiteSpace = "pre-wrap";
-  div.style.wordWrap = "break-word";
+  div.style.overflowWrap = "break-word";
   properties.forEach((prop) => {
     div.style[prop] = style[prop];
   });
@@ -857,10 +890,10 @@ function getTextareaCaretPosition(textarea, position) {
   const result = {
     left: textareaRect.left + (spanRect.left - divRect.left) - textarea.scrollLeft,
     top: textareaRect.top + (spanRect.top - divRect.top) - textarea.scrollTop,
-    height: parseFloat(style.lineHeight) || 20
+    height: Number.parseFloat(style.lineHeight) || 20
   };
 
-  document.body.removeChild(div);
+  div.remove();
   return result;
 }
 
@@ -905,11 +938,6 @@ function getNativeTextareaPositionFromPoint(textarea, clientX, clientY) {
     if (position?.offsetNode === textarea) return clamp(position.offset, 0, textarea.value.length);
   }
 
-  if (typeof document.caretRangeFromPoint === "function") {
-    const range = document.caretRangeFromPoint(clientX, clientY);
-    if (range?.startContainer === textarea) return clamp(range.startOffset, 0, textarea.value.length);
-  }
-
   return null;
 }
 
@@ -947,7 +975,7 @@ async function activateTab(relativePath, type, options = {}) {
     const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
     const content = state.noteContent.has(relativePath)
       ? state.noteContent.get(relativePath)
-      : await window.tektite.readNote(state.rootPath, relativePath);
+      : await globalThis.tektite.readNote(state.rootPath, relativePath);
 
     state.activeContent = content;
     state.noteContent.set(relativePath, content);
@@ -966,7 +994,7 @@ async function activateTab(relativePath, type, options = {}) {
     els.editor.disabled = true;
     els.editor.classList.add("hidden");
     els.imageViewer.classList.remove("hidden");
-    const dataUrl = await window.tektite.readAssetDataUrl(state.rootPath, relativePath);
+    const dataUrl = await globalThis.tektite.readAssetDataUrl(state.rootPath, relativePath);
     els.imageViewerImage.src = dataUrl;
     els.imageViewerImage.alt = relativePath.split("/").pop() || relativePath;
     els.noteTitle.textContent = relativePath.split("/").pop() || relativePath;
@@ -1044,7 +1072,8 @@ async function closeEditorTab(path, type) {
     return;
   }
 
-  const nextTab = state.openTabs[Math.min(index, state.openTabs.length - 1)];
+  const nextIndex = Math.min(index, state.openTabs.length - 1);
+  const nextTab = nextIndex === -1 ? undefined : state.openTabs[nextIndex];
   if (nextTab) {
     await activateTab(nextTab.path, nextTab.type);
   } else {
@@ -1177,10 +1206,10 @@ async function saveActiveNote() {
   if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
   state.activeContent = els.editor.value;
   setSaveState("Saving...");
-  await window.tektite.writeNote(state.rootPath, state.activePath, state.activeContent);
+  await globalThis.tektite.writeNote(state.rootPath, state.activePath, state.activeContent);
   state.noteContent.set(state.activePath, state.activeContent);
   setSaveState("Saved");
-  const vault = await window.tektite.scanVault(state.rootPath);
+  const vault = await globalThis.tektite.scanVault(state.rootPath);
   state.tree = vault.tree;
   state.notes = vault.notes;
   indexNotes();
@@ -1231,7 +1260,7 @@ async function loadGraphContent() {
   await Promise.all(
     state.notes.map(async (note) => {
       try {
-        nextContent.set(note.path, await window.tektite.readNote(state.rootPath, note.path));
+        nextContent.set(note.path, await globalThis.tektite.readNote(state.rootPath, note.path));
       } catch {
         nextContent.set(note.path, "");
       }
@@ -1271,26 +1300,31 @@ function renderVaultRootDropRow() {
 }
 
 function renderTreeNode(node, query) {
-  if (node.type === "note" || node.type === "asset") {
-    const label = displayNoteLabel(node);
-    if (query && !node.title.toLowerCase().includes(query) && !node.path.toLowerCase().includes(query)) {
-      return null;
-    }
+  if (node.type === "note" || node.type === "asset") return renderTreeLeafNode(node, query);
+  return renderTreeFolderNode(node, query);
+}
 
-    const button = document.createElement("button");
-    button.className = `tree-row${isSelected(node.path, node.type) ? " selected" : ""}${node.path === state.activePath ? " active" : ""}`;
-    button.type = "button";
-    button.draggable = true;
-    button.dataset.path = node.path;
-    button.dataset.type = node.type;
-    button.innerHTML = `<span class="tree-kind-icon" aria-hidden="true">${node.type === "note" ? "◆" : "▧"}</span><span class="tree-label">${escapeHtml(label)}</span>`;
-    button.addEventListener("click", () => {
-      if (node.type === "note") openNote(node.path);
-      else openAsset(node.path);
-    });
-    return button;
+function renderTreeLeafNode(node, query) {
+  const label = displayNoteLabel(node);
+  if (query && !node.title.toLowerCase().includes(query) && !node.path.toLowerCase().includes(query)) {
+    return null;
   }
 
+  const button = document.createElement("button");
+  button.className = `tree-row${isSelected(node.path, node.type) ? " selected" : ""}${node.path === state.activePath ? " active" : ""}`;
+  button.type = "button";
+  button.draggable = true;
+  button.dataset.path = node.path;
+  button.dataset.type = node.type;
+  button.innerHTML = `<span class="tree-kind-icon" aria-hidden="true">${node.type === "note" ? "◆" : "▧"}</span><span class="tree-label">${escapeHtml(label)}</span>`;
+  button.addEventListener("click", () => {
+    if (node.type === "note") openNote(node.path);
+    else openAsset(node.path);
+  });
+  return button;
+}
+
+function renderTreeFolderNode(node, query) {
   const childNodes = Array.isArray(node.children) ? node.children : [];
   const renderedChildren = childNodes.map((child) => renderTreeNode(child, query)).filter(Boolean);
   if (query && renderedChildren.length === 0) return null;
@@ -1355,16 +1389,18 @@ function openTreeContextMenu(x, y, context) {
   ];
 
   if (context.path) {
-    items.push({ type: "separator" });
-    items.push({
-      label: context.type === "folder" ? "Rename folder" : "Rename file",
-      action: () => renameSelectedEntry(context)
-    });
-    items.push({
-      label: context.type === "folder" ? "Delete folder" : "Delete file",
-      danger: true,
-      action: () => deleteSelectedEntry(context)
-    });
+    items.push(
+      { type: "separator" },
+      {
+        label: context.type === "folder" ? "Rename folder" : "Rename file",
+        action: () => renameSelectedEntry(context)
+      },
+      {
+        label: context.type === "folder" ? "Delete folder" : "Delete file",
+        danger: true,
+        action: () => deleteSelectedEntry(context)
+      }
+    );
   }
 
   els.treeContextMenu.innerHTML = "";
@@ -1389,8 +1425,8 @@ function openTreeContextMenu(x, y, context) {
 
   els.treeContextMenu.classList.remove("hidden");
   const rect = els.treeContextMenu.getBoundingClientRect();
-  els.treeContextMenu.style.left = `${Math.min(x, window.innerWidth - rect.width - 8)}px`;
-  els.treeContextMenu.style.top = `${Math.min(y, window.innerHeight - rect.height - 8)}px`;
+  els.treeContextMenu.style.left = `${Math.min(x, globalThis.innerWidth - rect.width - 8)}px`;
+  els.treeContextMenu.style.top = `${Math.min(y, globalThis.innerHeight - rect.height - 8)}px`;
 }
 
 function closeTreeContextMenu() {
@@ -1445,90 +1481,100 @@ function renderPreview(markdown) {
 }
 
 function markdownToHtml(markdown, sourcePath = "") {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-  const blocks = [];
-  let paragraph = [];
-  let list = [];
-  let inCode = false;
-  let code = [];
+  const context = {
+    sourcePath,
+    blocks: [],
+    paragraph: [],
+    list: [],
+    inCode: false,
+    code: []
+  };
 
-  function flushParagraph() {
-    if (paragraph.length) {
-      blocks.push(`<p>${inlineMarkdown(paragraph.join(" "), sourcePath)}</p>`);
-      paragraph = [];
-    }
+  for (const line of markdown.replaceAll("\r\n", "\n").split("\n")) {
+    processMarkdownLine(context, line);
   }
 
-  function flushList() {
-    if (list.length) {
-      blocks.push(`<ul>${list.map((item) => `<li>${inlineMarkdown(item, sourcePath)}</li>`).join("")}</ul>`);
-      list = [];
-    }
+  flushMarkdownParagraph(context);
+  flushMarkdownList(context);
+  if (context.inCode) flushMarkdownCode(context, true);
+  return context.blocks.join("\n") || "<p>Start writing.</p>";
+}
+
+function processMarkdownLine(context, line) {
+  if (line.startsWith("```")) return toggleMarkdownCode(context);
+  if (context.inCode) {
+    context.code.push(line);
+    return;
+  }
+  if (!line.trim()) return flushMarkdownBlocks(context);
+
+  const heading = line.match(/^(#{1,6})\s+(.+)$/);
+  if (heading) return appendMarkdownHeading(context, heading);
+  if (/^---+$/.test(line.trim())) return appendMarkdownRule(context);
+
+  const listItem = line.match(/^\s*[-*+]\s+(.+)$/);
+  if (listItem) {
+    flushMarkdownParagraph(context);
+    context.list.push(listItem[1]);
+    return;
   }
 
-  for (const line of lines) {
-    if (line.startsWith("```")) {
-      if (inCode) {
-        blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
-        inCode = false;
-        code = [];
-      } else {
-        flushParagraph();
-        flushList();
-        inCode = true;
-      }
-      continue;
-    }
+  const quote = line.match(/^>\s?(.*)$/);
+  if (quote) return appendMarkdownQuote(context, quote[1]);
+  context.paragraph.push(line.trim());
+}
 
-    if (inCode) {
-      code.push(line);
-      continue;
-    }
-
-    if (!line.trim()) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.+)$/);
-    if (heading) {
-      flushParagraph();
-      flushList();
-      const level = heading[1].length;
-      blocks.push(`<h${level}>${inlineMarkdown(heading[2], sourcePath)}</h${level}>`);
-      continue;
-    }
-
-    if (/^---+$/.test(line.trim())) {
-      flushParagraph();
-      flushList();
-      blocks.push("<hr>");
-      continue;
-    }
-
-    const listItem = line.match(/^\s*[-*+]\s+(.+)$/);
-    if (listItem) {
-      flushParagraph();
-      list.push(listItem[1]);
-      continue;
-    }
-
-    const quote = line.match(/^>\s?(.*)$/);
-    if (quote) {
-      flushParagraph();
-      flushList();
-      blocks.push(`<blockquote>${inlineMarkdown(quote[1], sourcePath)}</blockquote>`);
-      continue;
-    }
-
-    paragraph.push(line.trim());
+function toggleMarkdownCode(context) {
+  if (context.inCode) {
+    flushMarkdownCode(context, true);
+    context.inCode = false;
+    return;
   }
+  flushMarkdownBlocks(context);
+  context.inCode = true;
+}
 
-  flushParagraph();
-  flushList();
-  if (inCode) blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
-  return blocks.join("\n") || "<p>Start writing.</p>";
+function flushMarkdownBlocks(context) {
+  flushMarkdownParagraph(context);
+  flushMarkdownList(context);
+}
+
+function flushMarkdownParagraph(context) {
+  if (!context.paragraph.length) return;
+  context.blocks.push(`<p>${inlineMarkdown(context.paragraph.join(" "), context.sourcePath)}</p>`);
+  context.paragraph = [];
+}
+
+function flushMarkdownList(context) {
+  if (!context.list.length) return;
+  const items = context.list
+    .map((item) => `<li>${inlineMarkdown(item, context.sourcePath)}</li>`)
+    .join("");
+  context.blocks.push(`<ul>${items}</ul>`);
+  context.list = [];
+}
+
+function flushMarkdownCode(context, force = false) {
+  if (!force && !context.code.length) return;
+  context.blocks.push(`<pre><code>${escapeHtml(context.code.join("\n"))}</code></pre>`);
+  context.code = [];
+}
+
+function appendMarkdownHeading(context, heading) {
+  flushMarkdownBlocks(context);
+  const level = heading[1].length;
+  const content = inlineMarkdown(heading[2], context.sourcePath);
+  context.blocks.push(`<h${level}>${content}</h${level}>`);
+}
+
+function appendMarkdownRule(context) {
+  flushMarkdownBlocks(context);
+  context.blocks.push("<hr>");
+}
+
+function appendMarkdownQuote(context, quote) {
+  flushMarkdownBlocks(context);
+  context.blocks.push(`<blockquote>${inlineMarkdown(quote, context.sourcePath)}</blockquote>`);
 }
 
 function inlineMarkdown(value, sourcePath = "") {
@@ -1618,7 +1664,7 @@ function buildNoteCandidates(target, sourcePath = "") {
 }
 
 function normalizeNoteTarget(target) {
-  return normalizeVaultPath(target.replace(/\\/g, "/").replace(/^\.\/+/, ""));
+  return normalizeVaultPath(target.replaceAll("\\", "/").replace(/^\.\/+/, ""));
 }
 
 function normalizeVaultPath(value) {
@@ -1695,25 +1741,20 @@ function extractTargets(markdown) {
   const md = /(?<!!)\[[^\]]+\]\(([^)]+)\)/g;
   let match;
 
-  while ((match = wiki.exec(markdown))) targets.push(match[1]);
-  while ((match = md.exec(markdown))) targets.push(match[1]);
+  const wikiTargets = [];
+  const markdownTargets = [];
+  while ((match = wiki.exec(markdown))) wikiTargets.push(match[1]);
+  while ((match = md.exec(markdown))) markdownTargets.push(match[1]);
+  targets.push(...wikiTargets, ...markdownTargets);
   return targets;
 }
 
 function drawGraph({ nodes, edges }) {
   const svg = els.graphSvg;
-  const theme = getComputedStyle(document.documentElement);
-  const graphEdge = theme.getPropertyValue("--graph-edge").trim() || "#557b7f";
-  const graphNode = theme.getPropertyValue("--graph-node").trim() || "#25272d";
-  const accent = theme.getPropertyValue("--accent").trim() || "#65a8ad";
-  const accentDark = theme.getPropertyValue("--accent-dark").trim() || "#7fb9bd";
-  const ink = theme.getPropertyValue("--ink").trim() || "#ece6da";
+  const colors = graphColors();
   const rect = svg.getBoundingClientRect();
   const width = Math.max(rect.width || 720, 480);
   const height = Math.max(rect.height || 520, 420);
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const radius = Math.min(width, height) * 0.35;
 
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   svg.innerHTML = "";
@@ -1721,6 +1762,25 @@ function drawGraph({ nodes, edges }) {
 
   if (!nodes.length) return;
 
+  layoutGraphNodes(nodes, edges, width, height);
+  renderGraphSvg(svg, nodes, edges, colors);
+}
+
+function graphColors() {
+  const theme = getComputedStyle(document.documentElement);
+  return {
+    edge: theme.getPropertyValue("--graph-edge").trim() || "#557b7f",
+    node: theme.getPropertyValue("--graph-node").trim() || "#25272d",
+    accent: theme.getPropertyValue("--accent").trim() || "#65a8ad",
+    accentDark: theme.getPropertyValue("--accent-dark").trim() || "#7fb9bd",
+    ink: theme.getPropertyValue("--ink").trim() || "#ece6da"
+  };
+}
+
+function layoutGraphNodes(nodes, edges, width, height) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(width, height) * 0.35;
   nodes.forEach((node, index) => {
     const saved = state.graphPositions.get(node.id);
     if (saved) {
@@ -1734,46 +1794,61 @@ function drawGraph({ nodes, edges }) {
   });
 
   const hasSavedLayout = nodes.some((node) => state.graphPositions.has(node.id));
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   for (let tick = 0; tick < (hasSavedLayout ? 24 : 180); tick += 1) {
-    for (let i = 0; i < nodes.length; i += 1) {
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const a = nodes[i];
-        const b = nodes[j];
-        const dx = a.x - b.x || 0.01;
-        const dy = a.y - b.y || 0.01;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const force = Math.min(1200 / (distance * distance), 2.6);
-        a.x += (dx / distance) * force;
-        a.y += (dy / distance) * force;
-        b.x -= (dx / distance) * force;
-        b.y -= (dy / distance) * force;
-      }
-    }
-
-    for (const edge of edges) {
-      const source = nodes.find((node) => node.id === edge.source);
-      const target = nodes.find((node) => node.id === edge.target);
-      if (!source || !target) continue;
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      source.x += dx * 0.006;
-      source.y += dy * 0.006;
-      target.x -= dx * 0.006;
-      target.y -= dy * 0.006;
-    }
-
-    for (const node of nodes) {
-      node.x += (centerX - node.x) * 0.012;
-      node.y += (centerY - node.y) * 0.012;
-      node.x = Math.max(48, Math.min(width - 48, node.x));
-      node.y = Math.max(44, Math.min(height - 44, node.y));
-    }
+    applyGraphRepulsion(nodes);
+    applyGraphEdgeAttraction(edges, nodeMap);
+    pullGraphNodesToCenter(nodes, centerX, centerY, width, height);
   }
 
   nodes.forEach((node) => {
     state.graphPositions.set(node.id, { x: node.x, y: node.y });
   });
+}
 
+function applyGraphRepulsion(nodes) {
+  for (let i = 0; i < nodes.length; i += 1) {
+    for (let j = i + 1; j < nodes.length; j += 1) {
+      pushGraphNodesApart(nodes[i], nodes[j]);
+    }
+  }
+}
+
+function pushGraphNodesApart(a, b) {
+  const dx = a.x - b.x || 0.01;
+  const dy = a.y - b.y || 0.01;
+  const distance = Math.hypot(dx, dy);
+  const force = Math.min(1200 / (distance * distance), 2.6);
+  a.x += (dx / distance) * force;
+  a.y += (dy / distance) * force;
+  b.x -= (dx / distance) * force;
+  b.y -= (dy / distance) * force;
+}
+
+function applyGraphEdgeAttraction(edges, nodeMap) {
+  for (const edge of edges) {
+    const source = nodeMap.get(edge.source);
+    const target = nodeMap.get(edge.target);
+    if (!source || !target) continue;
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    source.x += dx * 0.006;
+    source.y += dy * 0.006;
+    target.x -= dx * 0.006;
+    target.y -= dy * 0.006;
+  }
+}
+
+function pullGraphNodesToCenter(nodes, centerX, centerY, width, height) {
+  for (const node of nodes) {
+    node.x += (centerX - node.x) * 0.012;
+    node.y += (centerY - node.y) * 0.012;
+    node.x = clamp(node.x, 48, width - 48);
+    node.y = clamp(node.y, 44, height - 44);
+  }
+}
+
+function renderGraphSvg(svg, nodes, edges, colors) {
   const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
   const nodeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
   const viewportLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -1790,7 +1865,7 @@ function drawGraph({ nodes, edges }) {
     line.setAttribute("y1", source.y);
     line.setAttribute("x2", target.x);
     line.setAttribute("y2", target.y);
-    line.setAttribute("stroke", graphEdge);
+    line.setAttribute("stroke", colors.edge);
     line.setAttribute("stroke-width", "1.4");
     line.dataset.source = edge.source;
     line.dataset.target = edge.target;
@@ -1799,7 +1874,7 @@ function drawGraph({ nodes, edges }) {
 
   for (const node of nodes) {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("data-note-path", node.id);
+    group.dataset.notePath = node.id;
     group.setAttribute("class", "graph-node");
     group.style.cursor = "pointer";
 
@@ -1809,15 +1884,15 @@ function drawGraph({ nodes, edges }) {
     circle.setAttribute("cx", node.x);
     circle.setAttribute("cy", node.y);
     circle.setAttribute("r", nodeRadius);
-    circle.setAttribute("fill", node.active ? accent : graphNode);
-    circle.setAttribute("stroke", node.active ? accentDark : accent);
+    circle.setAttribute("fill", node.active ? colors.accent : colors.node);
+    circle.setAttribute("stroke", node.active ? colors.accentDark : colors.accent);
     circle.setAttribute("stroke-width", node.active ? "3" : "2");
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("x", node.x + labelOffset);
     label.setAttribute("y", node.y + 4);
     label.dataset.offsetX = String(labelOffset);
-    label.setAttribute("fill", ink);
+    label.setAttribute("fill", colors.ink);
     label.setAttribute("font-size", "12");
     label.setAttribute("font-weight", node.active ? "700" : "560");
     label.textContent = node.title;
@@ -1875,9 +1950,9 @@ function onGraphPointerDown(event) {
   event.preventDefault();
   els.graphSvg.setPointerCapture(event.pointerId);
   els.graphSvg.classList.add(notePath ? "dragging-node" : "panning");
-  window.addEventListener("pointermove", onGraphPointerMove);
-  window.addEventListener("pointerup", stopGraphPan, { once: true });
-  window.addEventListener("pointercancel", stopGraphPan, { once: true });
+  globalThis.addEventListener("pointermove", onGraphPointerMove);
+  globalThis.addEventListener("pointerup", stopGraphPan, { once: true });
+  globalThis.addEventListener("pointercancel", stopGraphPan, { once: true });
 }
 
 function onGraphPointerMove(event) {
@@ -1907,10 +1982,9 @@ function stopGraphPan() {
   const notePath = state.graphDrag.notePath;
   const shouldOpen = state.graphDrag.mode === "node" && notePath && !state.graphDrag.didMove;
   state.graphDrag = null;
-  els.graphSvg.classList.remove("panning");
-  els.graphSvg.classList.remove("dragging-node");
-  window.removeEventListener("pointermove", onGraphPointerMove);
-  window.removeEventListener("pointercancel", stopGraphPan);
+  els.graphSvg.classList.remove("panning", "dragging-node");
+  globalThis.removeEventListener("pointermove", onGraphPointerMove);
+  globalThis.removeEventListener("pointercancel", stopGraphPan);
   if (shouldOpen) openNote(notePath);
 }
 
@@ -1962,7 +2036,7 @@ function onPreviewClick(event) {
 function openNoteFromPreviewLink(notePath) {
   if (!notePath || notePath === state.activePath || !state.noteByPath.has(notePath)) return;
   if (state.activePath && state.activeType === "note") {
-    const lastPath = state.previewHistory[state.previewHistory.length - 1];
+    const lastPath = state.previewHistory.at(-1);
     if (lastPath !== state.activePath) state.previewHistory.push(state.activePath);
   }
   state.previewForwardHistory = [];
@@ -2010,7 +2084,7 @@ function targetFolder() {
 }
 
 function folderForContext(context) {
-  if (!context || !context.path) return "";
+  if (!context?.path) return "";
   if (context.type === "folder") return context.path;
   return parentFolder(context.path);
 }
@@ -2044,7 +2118,7 @@ function entryExists(path, type) {
 }
 
 function folderExists(node, path) {
-  if (!node || node.type !== "folder") return false;
+  if (node?.type !== "folder") return false;
   if (node.path === path) return true;
   const children = Array.isArray(node.children) ? node.children : [];
   return children.some((child) => folderExists(child, path));
@@ -2062,26 +2136,26 @@ function setSaveState(value) {
 }
 
 function stash(tokens, html) {
-  const token = `\u0000${tokens.length}\u0000`;
+  const token = `@@TEKTITE_STASH_${tokens.length}@@`;
   tokens.push(html);
   return token;
 }
 
 function restore(tokens, text) {
-  return text.replace(/\u0000(\d+)\u0000/g, (_match, index) => tokens[Number(index)]);
+  return text.replace(/@@TEKTITE_STASH_(\d+)@@/g, (_match, index) => tokens[Number(index)]);
 }
 
 function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function escapeAttr(value) {
-  return escapeHtml(value).replace(/`/g, "&#096;");
+  return escapeHtml(value).replaceAll("`", "&#096;");
 }
 
 function clamp(value, min, max) {
@@ -2089,6 +2163,10 @@ function clamp(value, min, max) {
 }
 
 function cssEscape(value) {
-  if (window.CSS?.escape) return window.CSS.escape(value);
-  return String(value).replace(/["\\]/g, "\\$&");
+  if (globalThis.CSS?.escape) return globalThis.CSS.escape(value);
+  const backslash = String.fromCodePoint(92);
+  const quote = String.fromCodePoint(34);
+  return String(value)
+    .replaceAll(backslash, backslash + backslash)
+    .replaceAll(quote, backslash + quote);
 }

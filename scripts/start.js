@@ -1,5 +1,5 @@
-const path = require("path");
-const { spawn } = require("child_process");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
 const { packager } = require("@electron/packager");
 
 const root = path.join(__dirname, "..");
@@ -48,7 +48,11 @@ function run(command, args, cwd) {
   });
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
+process.nextTick(async () => {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
 });

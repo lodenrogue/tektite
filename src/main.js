@@ -1,6 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } = require("electron");
-const fs = require("fs/promises");
-const path = require("path");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 
 let mainWindow;
 let aboutWindow;
@@ -233,23 +233,22 @@ function buildMenu() {
         { role: "togglefullscreen" }
       ]
     },
-    ...(!isMac
-      ? [
+    ...(isMac
+      ? []
+      : [
           {
             label: "Help",
             submenu: [{ label: "About Tektite", click: showAboutWindow }]
           }
-        ]
-      : [])
+        ])
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+app.on("ready", async () => {
   app.setName("Tektite");
-  return loadRecentVaults();
-}).then(() => {
+  await loadRecentVaults();
   buildMenu();
   createSplashWindow();
   createWindow({ show: false });
@@ -683,7 +682,7 @@ function decodeMarkdownLink(value) {
 }
 
 function encodeMarkdownLink(value) {
-  return encodeURI(value).replace(/%5B/g, "[").replace(/%5D/g, "]");
+  return encodeURI(value).replaceAll("%5B", "[").replaceAll("%5D", "]");
 }
 
 function parentPosix(value) {
