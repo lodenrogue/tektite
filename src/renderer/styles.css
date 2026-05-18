@@ -224,10 +224,15 @@ body.resizing-y textarea {
   color: var(--ink);
 }
 
-.icon-button:hover {
+.icon-button:hover:not(:disabled) {
   background: var(--tree-active-bg);
   color: var(--tree-active-ink);
   border-color: var(--tree-active-bg);
+}
+
+.icon-button:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .header-actions .icon-button::after {
@@ -543,6 +548,16 @@ button.tree-row {
 .preview-pane > .pane-header {
   min-height: var(--pane-header-height);
   padding: 12px 18px;
+}
+
+.preview-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preview-back-button {
+  font-size: 22px;
+  line-height: 1;
 }
 
 .markdown-preview,

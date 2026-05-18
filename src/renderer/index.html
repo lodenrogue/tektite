@@ -61,7 +61,12 @@
         <div id="workspaceResizer" class="resizer resizer-workspace" role="separator" aria-orientation="vertical" aria-label="Resize editor and preview panes"></div>
 
         <section class="preview-pane">
-          <div class="pane-header">Preview</div>
+          <div class="pane-header preview-header">
+            <span>Preview</span>
+            <button id="previewBackButton" class="icon-button preview-back-button" type="button" aria-label="Back" disabled>
+              <span aria-hidden="true">‹</span>
+            </button>
+          </div>
           <article id="preview" class="markdown-preview"></article>
         </section>
       </main>

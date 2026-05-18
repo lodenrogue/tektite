@@ -6,11 +6,13 @@ let mainWindow;
 let aboutWindow;
 let splashWindow;
 let splashShownAt = 0;
+let recentVaults = [];
 const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includes("tektite");
 const appIconPath = path.join(__dirname, "..", "tektive-icon.webp");
 const fallbackAppIconPath = path.join(__dirname, "..", "assets", "icons", "tektite-icon.png");
 const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif"]);
 const splashMinimumMs = 1200;
+const recentVaultLimit = 10;
 
 app.name = "Tektite";
 app.setName("Tektite");
@@ -129,8 +131,43 @@ function loadAppIcon() {
   return nativeImage.createFromPath(fallbackAppIconPath);
 }
 
+async function loadRecentVaults() {
+  try {
+    const raw = await fs.readFile(recentVaultsPath(), "utf8");
+    const parsed = JSON.parse(raw);
+    recentVaults = Array.isArray(parsed)
+      ? parsed.filter((value) => typeof value === "string").slice(0, recentVaultLimit)
+      : [];
+  } catch {
+    recentVaults = [];
+  }
+}
+
+async function rememberRecentVault(rootPath) {
+  const normalized = path.resolve(rootPath);
+  recentVaults = [
+    normalized,
+    ...recentVaults.filter((vaultPath) => path.resolve(vaultPath) !== normalized)
+  ].slice(0, recentVaultLimit);
+
+  await fs.mkdir(path.dirname(recentVaultsPath()), { recursive: true });
+  await fs.writeFile(recentVaultsPath(), JSON.stringify(recentVaults, null, 2), "utf8");
+  buildMenu();
+}
+
+function recentVaultsPath() {
+  return path.join(app.getPath("userData"), "recent-vaults.json");
+}
+
 function buildMenu() {
   const isMac = process.platform === "darwin";
+  const recentVaultItems = recentVaults.length > 0
+    ? recentVaults.map((vaultPath) => ({
+        label: path.basename(vaultPath) || vaultPath,
+        sublabel: vaultPath,
+        click: () => mainWindow?.webContents.send("menu:open-recent-vault", vaultPath)
+      }))
+    : [{ label: "No Recent Vaults", enabled: false }];
   const template = [
     ...(isMac
       ? [
@@ -157,6 +194,10 @@ function buildMenu() {
           label: "Open Vault...",
           accelerator: "CmdOrCtrl+O",
           click: () => mainWindow?.webContents.send("menu:open-vault")
+        },
+        {
+          label: "Recent Vaults...",
+          submenu: recentVaultItems
         },
         {
           label: "New Node",
@@ -207,6 +248,8 @@ function buildMenu() {
 
 app.whenReady().then(() => {
   app.setName("Tektite");
+  return loadRecentVaults();
+}).then(() => {
   buildMenu();
   createSplashWindow();
   createWindow({ show: false });
@@ -240,6 +283,7 @@ ipcMain.handle("vault:scan", async (_event, rootPath) => {
   assertInsideVault(rootPath, rootPath);
   const tree = await readDirectory(rootPath, rootPath);
   const notes = flattenNotes(tree);
+  await rememberRecentVault(rootPath);
   log("vault:scan complete", { rootPath, notes: notes.length });
   return { rootPath, tree, notes };
 });

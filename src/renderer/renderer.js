@@ -27,6 +27,7 @@ const state = {
   },
   graphPositions: new Map(),
   graphDrag: null,
+  previewHistory: [],
   mention: {
     active: false,
     start: -1,
@@ -65,6 +66,7 @@ const els = {
   editor: document.getElementById("editor"),
   mentionMenu: document.getElementById("mentionMenu"),
   preview: document.getElementById("preview"),
+  previewBackButton: document.getElementById("previewBackButton"),
   graph: document.getElementById("graph"),
   graphSvg: document.getElementById("graphSvg"),
   graphEmpty: document.getElementById("graphEmpty"),
@@ -108,6 +110,7 @@ function boot() {
   els.fileTree.addEventListener("contextmenu", onTreeContextMenu);
   els.fileTree.addEventListener("click", closeTreeContextMenu);
   els.preview.addEventListener("click", onPreviewClick);
+  els.previewBackButton.addEventListener("click", goBackPreviewHistory);
   els.graphSvg.addEventListener("click", onGraphClick);
   els.graphSvg.addEventListener("wheel", onGraphWheel, { passive: false });
   els.graphSvg.addEventListener("pointerdown", onGraphPointerDown);
@@ -135,6 +138,7 @@ function boot() {
   });
 
   window.tektite.onOpenVault(chooseVault);
+  window.tektite.onOpenRecentVault(openVault);
   window.tektite.onNewNote(createNote);
 
   const lastVault = localStorage.getItem("tektite:lastVault");
@@ -278,6 +282,7 @@ async function openVault(rootPath) {
     state.notes = vault.notes;
     state.selectedPath = "";
     state.selectedType = "folder";
+    state.previewHistory = [];
     loadCollapsedFolders();
     indexNotes();
     await loadGraphContent();
@@ -848,6 +853,7 @@ function getNativeTextareaPositionFromPoint(textarea, clientX, clientY) {
 async function openNote(relativePath, options = {}) {
   log("openNote", relativePath);
   if (!state.rootPath || !state.noteByPath.has(relativePath)) return;
+  if (!options.preservePreviewHistory) state.previewHistory = [];
   const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
   const content = await window.tektite.readNote(state.rootPath, relativePath);
 
@@ -864,6 +870,7 @@ async function openNote(relativePath, options = {}) {
   resetEditorHistory(content, cursor);
   renderTree();
   renderPreview(content);
+  updatePreviewBackButton();
   updateGraph();
   setSaveState("Saved");
 }
@@ -985,12 +992,14 @@ async function saveActiveNote() {
 function showEmptyState(message = "Choose a local folder to start.") {
   state.activePath = null;
   state.activeContent = "";
+  state.previewHistory = [];
   els.editor.value = "";
   els.editor.disabled = true;
   resetEditorHistory("", 0);
   els.noteTitle.textContent = "Open a vault";
   els.notePath.textContent = message;
   els.preview.innerHTML = `<p class="empty-copy">${escapeHtml(message)}</p>`;
+  updatePreviewBackButton();
   updateGraph();
 }
 
@@ -1725,7 +1734,26 @@ function onPreviewClick(event) {
   const link = event.target.closest("[data-note-path]");
   if (!link) return;
   event.preventDefault();
-  openNote(link.dataset.notePath);
+  openNoteFromPreviewLink(link.dataset.notePath);
+}
+
+function openNoteFromPreviewLink(notePath) {
+  if (!notePath || notePath === state.activePath || !state.noteByPath.has(notePath)) return;
+  if (state.activePath) {
+    const lastPath = state.previewHistory[state.previewHistory.length - 1];
+    if (lastPath !== state.activePath) state.previewHistory.push(state.activePath);
+  }
+  openNote(notePath, { preservePreviewHistory: true });
+}
+
+function goBackPreviewHistory() {
+  const previousPath = state.previewHistory.pop();
+  if (!previousPath) return updatePreviewBackButton();
+  openNote(previousPath, { preservePreviewHistory: true });
+}
+
+function updatePreviewBackButton() {
+  els.previewBackButton.disabled = state.previewHistory.length === 0;
 }
 
 function onGraphClick(event) {

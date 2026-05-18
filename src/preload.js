@@ -18,5 +18,7 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("asset:import-image", rootPath, sourcePath, targetFolder),
   getFilePath: (file) => webUtils.getPathForFile(file),
   onOpenVault: (callback) => ipcRenderer.on("menu:open-vault", callback),
+  onOpenRecentVault: (callback) =>
+    ipcRenderer.on("menu:open-recent-vault", (_event, rootPath) => callback(rootPath)),
   onNewNote: (callback) => ipcRenderer.on("menu:new-note", callback)
 });

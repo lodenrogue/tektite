@@ -19,23 +19,34 @@
       body {
         margin: 0;
         min-height: 100vh;
-        display: grid;
-        place-items: center;
-        background: radial-gradient(circle at top, #232733 0, #111318 58%);
+        background: #111318;
       }
 
       main {
-        width: min(100%, 380px);
-        padding: 28px 28px 30px;
+        display: grid;
+        min-height: 100vh;
+        grid-template-rows: 1fr auto;
         text-align: center;
+      }
+
+      .logo-panel {
+        display: grid;
+        place-items: center;
+        padding: 12px 28px;
+        background: #ffffff;
       }
 
       img {
         width: 250px;
         max-width: 100%;
         display: block;
-        margin: 0 auto 18px;
+        margin: 0 auto;
         border-radius: 8px;
+      }
+
+      .details-panel {
+        padding: 24px 28px 30px;
+        background: radial-gradient(circle at top, #232733 0, #111318 70%);
       }
 
       h1 {
@@ -60,11 +71,15 @@
   </head>
   <body>
     <main>
-      <img src="../tektite-splash.png" alt="Tektite">
-      <h1>Tektite</h1>
-      <p class="version">Version <span id="version">0.1.0</span></p>
-      <p>&copy; 2026 Mathias Conradt</p>
-      <p>MIT License</p>
+      <section class="logo-panel" aria-label="Tektite logo">
+        <img src="../tektite-splash.png" alt="Tektite">
+      </section>
+      <section class="details-panel">
+        <h1>Tektite</h1>
+        <p class="version">Version <span id="version">0.1.0</span></p>
+        <p>&copy; 2026 Mathias Conradt</p>
+        <p>MIT License</p>
+      </section>
     </main>
     <script>
       const version = new URLSearchParams(window.location.search).get("version");
