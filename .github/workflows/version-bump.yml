@@ -12,6 +12,9 @@ jobs:
     name: Bump patch version for app changes
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    outputs:
+      app_changed: ${{ steps.changes.outputs.app_changed }}
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Checkout
@@ -73,3 +76,45 @@ jobs:
           git tag "v${version}"
           git push origin HEAD:main
           git push origin "v${version}"
+
+  release:
+    name: Build and publish release
+    needs: bump
+    if: needs.bump.outputs.app_changed == 'true'
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.bump.outputs.version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --registry=https://registry.npmjs.org/
+
+      - name: Syntax check
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/renderer/renderer.js
+          node --check scripts/start.js
+
+      - name: Package macOS app
+        run: npx electron-packager . Tektite --platform=darwin --arch=arm64 --icon=assets/icons/tektite-icon.icns --overwrite
+
+      - name: Create Homebrew cask zip
+        run: ditto -c -k --sequesterRsrc --keepParent Tektite-darwin-*/Tektite.app Tektite-macOS-arm64.zip
+
+      - name: Publish GitHub release asset
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: v${{ needs.bump.outputs.version }}
+          name: Tektite v${{ needs.bump.outputs.version }}
+          files: Tektite-macOS-arm64.zip

@@ -37,6 +37,10 @@ There is no login, cloud sync, telemetry, remote storage, or account system. You
 - Toggle dark and light mode. Dark mode is the default.
 - Custom Tektite app icon, splash screen, and About dialog.
 
+## Screenshots
+
+![Tektite screenshot](docs/images/screenshot.png)
+
 ## Run
 
 ```sh
