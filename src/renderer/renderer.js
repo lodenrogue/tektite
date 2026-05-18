@@ -28,6 +28,7 @@ const state = {
     y: 0
   },
   graphPositions: new Map(),
+  graphLayoutSignature: "",
   graphDrag: null,
   previewHistory: [],
   previewForwardHistory: [],
@@ -1755,6 +1756,13 @@ function drawGraph({ nodes, edges }) {
   const rect = svg.getBoundingClientRect();
   const width = Math.max(rect.width || 720, 480);
   const height = Math.max(rect.height || 520, 420);
+  const world = graphWorldSize(nodes.length, width, height);
+  const signature = graphLayoutSignature(nodes, edges);
+  if (signature !== state.graphLayoutSignature) {
+    state.graphPositions.clear();
+    state.graphLayoutSignature = signature;
+    fitGraphViewport(world.width, world.height, width, height);
+  }
 
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   svg.innerHTML = "";
@@ -1762,7 +1770,7 @@ function drawGraph({ nodes, edges }) {
 
   if (!nodes.length) return;
 
-  layoutGraphNodes(nodes, edges, width, height);
+  layoutGraphNodes(nodes, edges, world.width, world.height);
   renderGraphSvg(svg, nodes, edges, colors);
 }
 
@@ -1777,10 +1785,34 @@ function graphColors() {
   };
 }
 
+function graphLayoutSignature(nodes, edges) {
+  const nodeIds = nodes.map((node) => node.id).sort().join("|");
+  const edgeIds = edges
+    .map((edge) => `${edge.source}->${edge.target}`)
+    .sort()
+    .join("|");
+  return `${nodeIds}::${edgeIds}`;
+}
+
+function graphWorldSize(nodeCount, width, height) {
+  const density = Math.max(1, Math.sqrt(nodeCount));
+  return {
+    width: Math.max(width, Math.round(density * 220)),
+    height: Math.max(height, Math.round(density * 170))
+  };
+}
+
+function fitGraphViewport(worldWidth, worldHeight, width, height) {
+  const scale = clamp(Math.min(width / worldWidth, height / worldHeight) * 0.92, 0.28, 1);
+  state.graphViewport.scale = scale;
+  state.graphViewport.x = Math.round((width - worldWidth * scale) / 2);
+  state.graphViewport.y = Math.round((height - worldHeight * scale) / 2);
+}
+
 function layoutGraphNodes(nodes, edges, width, height) {
   const centerX = width / 2;
   const centerY = height / 2;
-  const radius = Math.min(width, height) * 0.35;
+  const radius = Math.min(width, height) * 0.42;
   nodes.forEach((node, index) => {
     const saved = state.graphPositions.get(node.id);
     if (saved) {
@@ -1795,15 +1827,21 @@ function layoutGraphNodes(nodes, edges, width, height) {
 
   const hasSavedLayout = nodes.some((node) => state.graphPositions.has(node.id));
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-  for (let tick = 0; tick < (hasSavedLayout ? 24 : 180); tick += 1) {
+  const ticks = hasSavedLayout ? 80 : graphLayoutTicks(nodes.length);
+  for (let tick = 0; tick < ticks; tick += 1) {
     applyGraphRepulsion(nodes);
     applyGraphEdgeAttraction(edges, nodeMap);
+    applyGraphCollision(nodes);
     pullGraphNodesToCenter(nodes, centerX, centerY, width, height);
   }
 
   nodes.forEach((node) => {
     state.graphPositions.set(node.id, { x: node.x, y: node.y });
   });
+}
+
+function graphLayoutTicks(nodeCount) {
+  return clamp(220 + nodeCount * 8, 260, 900);
 }
 
 function applyGraphRepulsion(nodes) {
@@ -1818,11 +1856,40 @@ function pushGraphNodesApart(a, b) {
   const dx = a.x - b.x || 0.01;
   const dy = a.y - b.y || 0.01;
   const distance = Math.hypot(dx, dy);
-  const force = Math.min(1200 / (distance * distance), 2.6);
+  const force = Math.min(5200 / (distance * distance), 8);
   a.x += (dx / distance) * force;
   a.y += (dy / distance) * force;
   b.x -= (dx / distance) * force;
   b.y -= (dy / distance) * force;
+}
+
+function applyGraphCollision(nodes) {
+  for (let i = 0; i < nodes.length; i += 1) {
+    for (let j = i + 1; j < nodes.length; j += 1) {
+      separateGraphNodes(nodes[i], nodes[j]);
+    }
+  }
+}
+
+function separateGraphNodes(a, b) {
+  const dx = b.x - a.x || 0.01;
+  const dy = b.y - a.y || 0.01;
+  const distance = Math.hypot(dx, dy);
+  const minDistance = graphNodeCollisionRadius(a) + graphNodeCollisionRadius(b);
+  if (distance >= minDistance) return;
+
+  const push = (minDistance - distance) * 0.56;
+  const nx = dx / distance;
+  const ny = dy / distance;
+  a.x -= nx * push;
+  a.y -= ny * push;
+  b.x += nx * push;
+  b.y += ny * push;
+}
+
+function graphNodeCollisionRadius(node) {
+  const labelWidth = Math.min(180, Math.max(48, node.title.length * 7));
+  return graphNodeRadius(node) + labelWidth * 0.24 + 18;
 }
 
 function applyGraphEdgeAttraction(edges, nodeMap) {
@@ -1832,19 +1899,20 @@ function applyGraphEdgeAttraction(edges, nodeMap) {
     if (!source || !target) continue;
     const dx = target.x - source.x;
     const dy = target.y - source.y;
-    source.x += dx * 0.006;
-    source.y += dy * 0.006;
-    target.x -= dx * 0.006;
-    target.y -= dy * 0.006;
+    source.x += dx * 0.0035;
+    source.y += dy * 0.0035;
+    target.x -= dx * 0.0035;
+    target.y -= dy * 0.0035;
   }
 }
 
 function pullGraphNodesToCenter(nodes, centerX, centerY, width, height) {
   for (const node of nodes) {
-    node.x += (centerX - node.x) * 0.012;
-    node.y += (centerY - node.y) * 0.012;
-    node.x = clamp(node.x, 48, width - 48);
-    node.y = clamp(node.y, 44, height - 44);
+    node.x += (centerX - node.x) * 0.0035;
+    node.y += (centerY - node.y) * 0.0035;
+    const margin = graphNodeCollisionRadius(node);
+    node.x = clamp(node.x, margin, width - margin);
+    node.y = clamp(node.y, margin, height - margin);
   }
 }
 
