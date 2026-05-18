@@ -8,7 +8,7 @@ let splashWindow;
 let splashShownAt = 0;
 let recentVaults = [];
 const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includes("tektite");
-const appIconPath = path.join(__dirname, "..", "tektive-icon.webp");
+const appIconPath = path.join(__dirname, "..", "assets", "app", "tektive-icon.webp");
 const fallbackAppIconPath = path.join(__dirname, "..", "assets", "icons", "tektite-icon.png");
 const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif"]);
 const splashMinimumMs = 1200;
