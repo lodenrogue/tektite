@@ -63,9 +63,14 @@
         <section class="preview-pane">
           <div class="pane-header preview-header">
             <span>Preview</span>
-            <button id="previewBackButton" class="icon-button preview-back-button" type="button" aria-label="Back" disabled>
-              <span aria-hidden="true">‹</span>
-            </button>
+            <div class="preview-nav-actions" aria-label="Preview navigation">
+              <button id="previewBackButton" class="icon-button preview-nav-button" type="button" aria-label="Back" disabled>
+                <span aria-hidden="true">‹</span>
+              </button>
+              <button id="previewForwardButton" class="icon-button preview-nav-button" type="button" aria-label="Forward" disabled>
+                <span aria-hidden="true">›</span>
+              </button>
+            </div>
           </div>
           <article id="preview" class="markdown-preview"></article>
         </section>

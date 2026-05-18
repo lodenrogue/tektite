@@ -551,13 +551,26 @@ button.tree-row {
 }
 
 .preview-header {
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.preview-back-button {
+.preview-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-nav-button {
   font-size: 22px;
   line-height: 1;
+}
+
+.preview-nav-button span {
+  display: block;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 .markdown-preview,
