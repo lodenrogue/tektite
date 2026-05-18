@@ -17,7 +17,7 @@ async function main() {
     platform: "darwin",
     arch: process.arch,
     electronVersion: require(path.join(root, "node_modules", "electron", "package.json")).version,
-    icon: path.join(root, "assets", "icons", "tektite-icon"),
+    icon: path.join(root, "assets", "icons", "tektite-icon.icns"),
     overwrite: true,
     out,
     ignore: [

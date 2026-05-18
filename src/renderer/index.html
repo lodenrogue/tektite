@@ -35,6 +35,14 @@
         </div>
 
         <nav class="file-tree" id="fileTree" aria-label="Vault files"></nav>
+        <div id="sidebarGraphResizer" class="resizer-y resizer-sidebar-graph" role="separator" aria-orientation="horizontal" aria-label="Resize file list and graph"></div>
+        <section class="sidebar-graph-pane">
+          <div class="pane-header">Graph</div>
+          <section id="graph" class="graph-view" aria-label="Graph view">
+            <svg id="graphSvg" role="img" aria-label="Note graph"></svg>
+            <div id="graphEmpty" class="graph-empty hidden">No links yet</div>
+          </section>
+        </section>
       </aside>
       <div id="sidebarResizer" class="resizer resizer-sidebar" role="separator" aria-orientation="vertical" aria-label="Resize sidebar"></div>
 
@@ -55,15 +63,6 @@
         <section class="preview-pane">
           <div class="pane-header">Preview</div>
           <article id="preview" class="markdown-preview"></article>
-        </section>
-        <div id="previewGraphResizer" class="resizer resizer-preview-graph" role="separator" aria-orientation="vertical" aria-label="Resize preview and graph panes"></div>
-
-        <section class="graph-pane">
-          <div class="pane-header">Graph</div>
-          <section id="graph" class="graph-view" aria-label="Graph view">
-            <svg id="graphSvg" role="img" aria-label="Note graph"></svg>
-            <div id="graphEmpty" class="graph-empty hidden">No links yet</div>
-          </section>
         </section>
       </main>
     </div>

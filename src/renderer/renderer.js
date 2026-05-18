@@ -16,8 +16,8 @@ const state = {
   nameDialogResolve: null,
   layout: {
     sidebarWidth: 300,
-    editorRatio: 0.4,
-    previewRatio: 0.3
+    editorRatio: 0.52,
+    sidebarGraphRatio: 0.34
   },
   activeResize: null,
   graphViewport: {
@@ -33,6 +33,12 @@ const state = {
     query: "",
     selectedIndex: 0,
     items: []
+  },
+  editorHistory: {
+    path: null,
+    stack: [],
+    index: -1,
+    restoring: false
   }
 };
 
@@ -62,11 +68,12 @@ const els = {
   graph: document.getElementById("graph"),
   graphSvg: document.getElementById("graphSvg"),
   graphEmpty: document.getElementById("graphEmpty"),
+  sidebar: document.querySelector(".sidebar"),
   appShell: document.querySelector(".app-shell"),
   workspace: document.querySelector(".workspace"),
   sidebarResizer: document.getElementById("sidebarResizer"),
   workspaceResizer: document.getElementById("workspaceResizer"),
-  previewGraphResizer: document.getElementById("previewGraphResizer"),
+  sidebarGraphResizer: document.getElementById("sidebarGraphResizer"),
   treeContextMenu: document.getElementById("treeContextMenu"),
   nameDialog: document.getElementById("nameDialog"),
   nameForm: document.getElementById("nameForm"),
@@ -106,7 +113,7 @@ function boot() {
   els.graphSvg.addEventListener("pointerdown", onGraphPointerDown);
   els.sidebarResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebar"));
   els.workspaceResizer.addEventListener("pointerdown", (event) => startResize(event, "editor"));
-  els.previewGraphResizer.addEventListener("pointerdown", (event) => startResize(event, "preview"));
+  els.sidebarGraphResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebarGraph"));
   els.nameForm.addEventListener("submit", onNameSubmit);
   els.cancelNameButton.addEventListener("click", () => closeNameDialog(null));
   els.cancelNameXButton.addEventListener("click", () => closeNameDialog(null));
@@ -142,12 +149,12 @@ function loadLayout() {
   try {
     const saved = JSON.parse(localStorage.getItem("tektite:layout") || "{}");
     state.layout.sidebarWidth = clamp(Number(saved.sidebarWidth) || 300, 220, 520);
-    state.layout.editorRatio = clamp(Number(saved.editorRatio) || 0.4, 0.22, 0.62);
-    state.layout.previewRatio = clamp(Number(saved.previewRatio) || 0.3, 0.2, 0.56);
+    state.layout.editorRatio = clamp(Number(saved.editorRatio) || 0.52, 0.28, 0.78);
+    state.layout.sidebarGraphRatio = clamp(Number(saved.sidebarGraphRatio) || 0.34, 0.2, 0.7);
   } catch {
     state.layout.sidebarWidth = 300;
-    state.layout.editorRatio = 0.4;
-    state.layout.previewRatio = 0.3;
+    state.layout.editorRatio = 0.52;
+    state.layout.sidebarGraphRatio = 0.34;
   }
 }
 
@@ -159,18 +166,14 @@ function applyLayout() {
   const windowWidth = window.innerWidth || 1200;
   const maxSidebar = Math.max(220, Math.min(620, windowWidth - 720));
   state.layout.sidebarWidth = clamp(state.layout.sidebarWidth, 220, maxSidebar);
-  state.layout.editorRatio = clamp(state.layout.editorRatio, 0.22, 0.62);
-  state.layout.previewRatio = clamp(state.layout.previewRatio, 0.2, 0.56);
-  if (state.layout.editorRatio + state.layout.previewRatio > 0.8) {
-    state.layout.previewRatio = 0.8 - state.layout.editorRatio;
-  }
+  state.layout.editorRatio = clamp(state.layout.editorRatio, 0.28, 0.78);
+  state.layout.sidebarGraphRatio = clamp(state.layout.sidebarGraphRatio, 0.2, 0.7);
 
   els.appShell.style.gridTemplateColumns = `${state.layout.sidebarWidth}px 6px minmax(0, 1fr)`;
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
-  const paneWidth = Math.max(1, workspaceWidth - 12);
-  const editorWidth = Math.round(paneWidth * state.layout.editorRatio);
-  const previewWidth = Math.round(paneWidth * state.layout.previewRatio);
-  els.workspace.style.gridTemplateColumns = `minmax(220px, ${editorWidth}px) 6px minmax(220px, ${previewWidth}px) 6px minmax(220px, 1fr)`;
+  const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
+  els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
+  els.sidebar.style.setProperty("--sidebar-graph-ratio", state.layout.sidebarGraphRatio);
 }
 
 function startResize(event, target) {
@@ -182,13 +185,15 @@ function startResize(event, target) {
     startX: event.clientX,
     startSidebarWidth: state.layout.sidebarWidth,
     startEditorRatio: state.layout.editorRatio,
-    startPreviewRatio: state.layout.previewRatio,
+    startSidebarGraphRatio: state.layout.sidebarGraphRatio,
     workspaceLeft: workspaceRect.left,
-    workspaceWidth: workspaceRect.width
+    workspaceWidth: workspaceRect.width,
+    sidebarTop: els.sidebar.getBoundingClientRect().top,
+    sidebarHeight: els.sidebar.getBoundingClientRect().height
   };
 
   event.currentTarget.setPointerCapture(event.pointerId);
-  document.body.classList.add("resizing");
+  document.body.classList.add(target === "sidebarGraph" ? "resizing-y" : "resizing");
   window.addEventListener("pointermove", onResizeMove);
   window.addEventListener("pointerup", stopResize, { once: true });
   window.addEventListener("pointercancel", stopResize, { once: true });
@@ -204,19 +209,11 @@ function onResizeMove(event) {
     state.layout.sidebarWidth = clamp(nextWidth, 220, maxSidebar);
   } else if (resize.target === "editor") {
     const x = event.clientX - resize.workspaceLeft;
-    const availableWidth = Math.max(1, resize.workspaceWidth - 12);
-    state.layout.editorRatio = clamp(x / availableWidth, 0.22, 0.62);
-    if (state.layout.editorRatio + state.layout.previewRatio > 0.8) {
-      state.layout.previewRatio = 0.8 - state.layout.editorRatio;
-    }
+    const availableWidth = Math.max(1, resize.workspaceWidth - 6);
+    state.layout.editorRatio = clamp(x / availableWidth, 0.28, 0.78);
   } else {
-    const x = event.clientX - resize.workspaceLeft;
-    const availableWidth = Math.max(1, resize.workspaceWidth - 12);
-    const nextPreviewRatio = x / availableWidth - state.layout.editorRatio;
-    state.layout.previewRatio = clamp(nextPreviewRatio, 0.2, 0.56);
-    if (state.layout.editorRatio + state.layout.previewRatio > 0.8) {
-      state.layout.previewRatio = 0.8 - state.layout.editorRatio;
-    }
+    const y = event.clientY - resize.sidebarTop;
+    state.layout.sidebarGraphRatio = clamp(1 - y / Math.max(1, resize.sidebarHeight), 0.2, 0.7);
   }
 
   applyLayout();
@@ -227,6 +224,7 @@ function stopResize() {
   if (!state.activeResize) return;
   state.activeResize = null;
   document.body.classList.remove("resizing");
+  document.body.classList.remove("resizing-y");
   window.removeEventListener("pointermove", onResizeMove);
   window.removeEventListener("pointercancel", stopResize);
   saveLayout();
@@ -517,6 +515,7 @@ function insertMentionLink(note) {
   closeMentionMenu();
   renderPreview(state.activeContent);
   updateGraph();
+  recordEditorHistory();
   setSaveState("Unsaved");
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveActiveNote, 150);
@@ -583,8 +582,8 @@ function markdownForEntry(entry) {
 }
 
 function insertEditorMarkdown(markdown, event) {
-  els.editor.focus();
   const position = getTextareaPositionFromPoint(els.editor, event.clientX, event.clientY);
+  els.editor.focus();
   els.editor.setSelectionRange(position, position);
 
   const insertion = markdown.endsWith("\n") ? markdown : `${markdown}\n`;
@@ -592,6 +591,7 @@ function insertEditorMarkdown(markdown, event) {
   state.activeContent = els.editor.value;
   renderPreview(state.activeContent);
   updateGraph();
+  recordEditorHistory();
   setSaveState("Unsaved");
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveActiveNote, 150);
@@ -797,6 +797,9 @@ function getTextareaCaretPosition(textarea, position) {
 }
 
 function getTextareaPositionFromPoint(textarea, clientX, clientY) {
+  const nativePosition = getNativeTextareaPositionFromPoint(textarea, clientX, clientY);
+  if (nativePosition !== null) return nativePosition;
+
   const value = textarea.value;
   if (!value) return 0;
 
@@ -828,6 +831,20 @@ function getTextareaPositionFromPoint(textarea, clientX, clientY) {
   return best;
 }
 
+function getNativeTextareaPositionFromPoint(textarea, clientX, clientY) {
+  if (typeof document.caretPositionFromPoint === "function") {
+    const position = document.caretPositionFromPoint(clientX, clientY);
+    if (position?.offsetNode === textarea) return clamp(position.offset, 0, textarea.value.length);
+  }
+
+  if (typeof document.caretRangeFromPoint === "function") {
+    const range = document.caretRangeFromPoint(clientX, clientY);
+    if (range?.startContainer === textarea) return clamp(range.startOffset, 0, textarea.value.length);
+  }
+
+  return null;
+}
+
 async function openNote(relativePath, options = {}) {
   log("openNote", relativePath);
   if (!state.rootPath || !state.noteByPath.has(relativePath)) return;
@@ -844,6 +861,7 @@ async function openNote(relativePath, options = {}) {
   els.noteTitle.textContent = state.noteByPath.get(relativePath).title;
   els.notePath.textContent = relativePath;
   els.editor.setSelectionRange(cursor, cursor);
+  resetEditorHistory(content, cursor);
   renderTree();
   renderPreview(content);
   updateGraph();
@@ -851,15 +869,86 @@ async function openNote(relativePath, options = {}) {
 }
 
 function onEditorInput() {
+  if (state.editorHistory.restoring) return;
   state.activeContent = els.editor.value;
   renderPreview(state.activeContent);
   updateMentionMenu();
+  recordEditorHistory();
   setSaveState("Unsaved");
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveActiveNote, 450);
 }
 
+function resetEditorHistory(content, cursor = 0) {
+  state.editorHistory = {
+    path: state.activePath,
+    stack: [{
+      content,
+      selectionStart: cursor,
+      selectionEnd: cursor
+    }],
+    index: 0,
+    restoring: false
+  };
+}
+
+function recordEditorHistory() {
+  if (!state.activePath || state.editorHistory.restoring) return;
+  if (state.editorHistory.path !== state.activePath) {
+    resetEditorHistory(els.editor.value, els.editor.selectionStart);
+    return;
+  }
+
+  const snapshot = {
+    content: els.editor.value,
+    selectionStart: els.editor.selectionStart,
+    selectionEnd: els.editor.selectionEnd
+  };
+  const current = state.editorHistory.stack[state.editorHistory.index];
+  if (current?.content === snapshot.content && current.selectionStart === snapshot.selectionStart && current.selectionEnd === snapshot.selectionEnd) {
+    return;
+  }
+
+  state.editorHistory.stack = state.editorHistory.stack.slice(0, state.editorHistory.index + 1);
+  state.editorHistory.stack.push(snapshot);
+  if (state.editorHistory.stack.length > 300) {
+    state.editorHistory.stack.shift();
+  }
+  state.editorHistory.index = state.editorHistory.stack.length - 1;
+}
+
+function restoreEditorHistory(delta) {
+  if (!state.activePath || state.editorHistory.path !== state.activePath) return;
+  const nextIndex = state.editorHistory.index + delta;
+  if (nextIndex < 0 || nextIndex >= state.editorHistory.stack.length) return;
+
+  const snapshot = state.editorHistory.stack[nextIndex];
+  state.editorHistory.index = nextIndex;
+  state.editorHistory.restoring = true;
+  els.editor.value = snapshot.content;
+  els.editor.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+  state.activeContent = snapshot.content;
+  renderPreview(state.activeContent);
+  updateGraph();
+  setSaveState("Unsaved");
+  clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(saveActiveNote, 450);
+  state.editorHistory.restoring = false;
+}
+
 function onEditorKeydown(event) {
+  const key = event.key.toLowerCase();
+  if ((event.metaKey || event.ctrlKey) && key === "z") {
+    event.preventDefault();
+    restoreEditorHistory(event.shiftKey ? 1 : -1);
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && key === "y") {
+    event.preventDefault();
+    restoreEditorHistory(1);
+    return;
+  }
+
   if (!state.mention.active) return;
 
   if (event.key === "ArrowDown") {
@@ -898,6 +987,7 @@ function showEmptyState(message = "Choose a local folder to start.") {
   state.activeContent = "";
   els.editor.value = "";
   els.editor.disabled = true;
+  resetEditorHistory("", 0);
   els.noteTitle.textContent = "Open a vault";
   els.notePath.textContent = message;
   els.preview.innerHTML = `<p class="empty-copy">${escapeHtml(message)}</p>`;

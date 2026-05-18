@@ -3,10 +3,14 @@ const fs = require("fs/promises");
 const path = require("path");
 
 let mainWindow;
+let aboutWindow;
+let splashWindow;
+let splashShownAt = 0;
 const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includes("tektite");
 const appIconPath = path.join(__dirname, "..", "tektive-icon.webp");
 const fallbackAppIconPath = path.join(__dirname, "..", "assets", "icons", "tektite-icon.png");
 const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif"]);
+const splashMinimumMs = 1200;
 
 app.name = "Tektite";
 app.setName("Tektite");
@@ -15,7 +19,8 @@ function log(...args) {
   if (verbose) console.log("[tektite:main]", ...args);
 }
 
-function createWindow() {
+function createWindow(options = {}) {
+  const shouldShowImmediately = options.show !== false;
   const appIcon = loadAppIcon();
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -24,6 +29,7 @@ function createWindow() {
     minHeight: 640,
     title: "Tektite",
     icon: appIcon,
+    show: shouldShowImmediately,
     backgroundColor: "#f7f4ed",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -33,10 +39,88 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  mainWindow.once("ready-to-show", () => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      const elapsed = Date.now() - splashShownAt;
+      setTimeout(() => {
+        if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+        splashWindow = null;
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+      }, Math.max(0, splashMinimumMs - elapsed));
+    } else if (!shouldShowImmediately && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(appIcon);
   }
+}
+
+function createSplashWindow() {
+  splashShownAt = Date.now();
+  splashWindow = new BrowserWindow({
+    width: 520,
+    height: 520,
+    frame: false,
+    resizable: false,
+    movable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    center: true,
+    title: "Tektite",
+    icon: loadAppIcon(),
+    backgroundColor: "#ffffff",
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  splashWindow.once("ready-to-show", () => {
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.show();
+  });
+  splashWindow.on("closed", () => {
+    splashWindow = null;
+  });
+}
+
+function showAboutWindow() {
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    aboutWindow.focus();
+    return;
+  }
+
+  aboutWindow = new BrowserWindow({
+    width: 420,
+    height: 520,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: "About Tektite",
+    parent: mainWindow || undefined,
+    modal: false,
+    icon: loadAppIcon(),
+    backgroundColor: "#111318",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  aboutWindow.setMenuBarVisibility(false);
+  aboutWindow.loadFile(path.join(__dirname, "about.html"), {
+    query: { version: app.getVersion() }
+  });
+  aboutWindow.on("closed", () => {
+    aboutWindow = null;
+  });
 }
 
 function loadAppIcon() {
@@ -53,7 +137,7 @@ function buildMenu() {
           {
             label: "Tektite",
             submenu: [
-              { role: "about" },
+              { label: "About Tektite", click: showAboutWindow },
               { type: "separator" },
               { role: "services" },
               { type: "separator" },
@@ -107,7 +191,15 @@ function buildMenu() {
         { type: "separator" },
         { role: "togglefullscreen" }
       ]
-    }
+    },
+    ...(!isMac
+      ? [
+          {
+            label: "Help",
+            submenu: [{ label: "About Tektite", click: showAboutWindow }]
+          }
+        ]
+      : [])
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -116,7 +208,8 @@ function buildMenu() {
 app.whenReady().then(() => {
   app.setName("Tektite");
   buildMenu();
-  createWindow();
+  createSplashWindow();
+  createWindow({ show: false });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
