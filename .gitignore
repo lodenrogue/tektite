@@ -1,3 +1,26 @@
+codex_session_id
+
+# Local agent/session files
+.agents/
+skills-lock.json
+
+# Tektite local packaged app launched by npm start
+.tektite-run/
+
+# Electron Packager output when no --out is supplied
+Tektite-darwin-*/
+Tektite-linux-*/
+Tektite-mas-*/
+Tektite-win32-*/
+
+# macOS / editor noise
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.vscode/
+.idea/
+
 # Logs
 logs
 *.log
