@@ -5,6 +5,8 @@ archive
 # Local agent/session files
 .agents/
 skills-lock.json
+.mcp.json
+.codex/config.toml
 
 # Tektite local packaged app launched by npm start
 .tektite-run/
