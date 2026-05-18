@@ -1,5 +1,5 @@
 cask "tektite" do
-  version "0.1.0"
+  version "0.1.1"
   sha256 :no_check
 
   url "https://github.com/mathiasconradt/tektite/releases/download/v#{version}/Tektite-macOS-arm64.zip"
