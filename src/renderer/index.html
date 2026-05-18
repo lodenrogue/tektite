@@ -55,7 +55,11 @@
             </div>
             <div class="save-state" id="saveState">Idle</div>
           </div>
+          <div id="editorTabs" class="editor-tabs" role="tablist" aria-label="Open files"></div>
           <textarea id="editor" spellcheck="true" disabled></textarea>
+          <div id="imageViewer" class="image-viewer hidden" aria-label="Image viewer">
+            <img id="imageViewerImage" alt="">
+          </div>
           <div id="mentionMenu" class="mention-menu hidden" role="listbox" aria-label="Select note link"></div>
         </section>
         <div id="workspaceResizer" class="resizer resizer-workspace" role="separator" aria-orientation="vertical" aria-label="Resize editor and preview panes"></div>

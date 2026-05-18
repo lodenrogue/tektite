@@ -459,6 +459,16 @@ ipcMain.handle("asset:import-image", async (_event, rootPath, sourcePath, target
   };
 });
 
+ipcMain.handle("asset:read-data-url", async (_event, rootPath, relativePath) => {
+  log("asset:read-data-url", relativePath);
+  const filePath = resolveVaultPath(rootPath, relativePath);
+  const extension = path.extname(filePath).toLowerCase();
+  if (!imageExtensions.has(extension)) throw new Error("Selected file is not a supported image.");
+
+  const data = await fs.readFile(filePath);
+  return `data:${imageMimeType(extension)};base64,${data.toString("base64")}`;
+});
+
 async function readDirectory(rootPath, currentPath) {
   log("readDirectory", toPosix(path.relative(rootPath, currentPath)) || ".");
   const entries = await fs.readdir(currentPath, { withFileTypes: true });
@@ -723,6 +733,24 @@ function renamedEntryName(currentName, requestedName, type) {
   }
 
   return `${requested.replace(/\.[^.]+$/, "") || fallback}${currentExtension}`;
+}
+
+function imageMimeType(extension) {
+  switch (extension) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".gif":
+      return "image/gif";
+    case ".webp":
+      return "image/webp";
+    case ".svg":
+      return "image/svg+xml";
+    case ".avif":
+      return "image/avif";
+    default:
+      return "image/png";
+  }
 }
 
 function sanitizeEntryName(value, fallback) {

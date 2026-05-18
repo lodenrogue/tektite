@@ -6,7 +6,9 @@ const state = {
   noteByTitle: new Map(),
   noteContent: new Map(),
   activePath: null,
+  activeType: null,
   activeContent: "",
+  openTabs: [],
   selectedPath: "",
   selectedType: "folder",
   showFileExtensions: false,
@@ -64,7 +66,10 @@ const els = {
   noteTitle: document.getElementById("noteTitle"),
   notePath: document.getElementById("notePath"),
   saveState: document.getElementById("saveState"),
+  editorTabs: document.getElementById("editorTabs"),
   editor: document.getElementById("editor"),
+  imageViewer: document.getElementById("imageViewer"),
+  imageViewerImage: document.getElementById("imageViewerImage"),
   mentionMenu: document.getElementById("mentionMenu"),
   preview: document.getElementById("preview"),
   previewBackButton: document.getElementById("previewBackButton"),
@@ -258,6 +263,7 @@ function toggleFileExtensions() {
   localStorage.setItem("tektite:showFileExtensions", state.showFileExtensions ? "1" : "0");
   updateSuffixButton();
   renderTree();
+  renderEditorTabs();
 }
 
 function updateSuffixButton() {
@@ -283,6 +289,10 @@ async function openVault(rootPath) {
     state.rootPath = vault.rootPath;
     state.tree = vault.tree;
     state.notes = vault.notes;
+    state.activePath = null;
+    state.activeType = null;
+    state.activeContent = "";
+    state.openTabs = [];
     state.selectedPath = "";
     state.selectedType = "folder";
     state.previewHistory = [];
@@ -296,6 +306,7 @@ async function openVault(rootPath) {
     renderTree();
     updateGraph();
 
+    renderEditorTabs();
     if (state.notes.length > 0) {
       await openNote(state.notes[0].path);
     } else {
@@ -314,26 +325,30 @@ async function refreshVault() {
   log("refreshVault start");
   if (!state.rootPath) return chooseVault();
   const activePath = state.activePath;
+  const activeType = state.activeType;
   const selectedPath = state.selectedPath;
   const selectedType = state.selectedType;
+  await flushActiveNote();
   const vault = await window.tektite.scanVault(state.rootPath);
   state.tree = vault.tree;
   state.notes = vault.notes;
   indexNotes();
+  reconcileOpenTabs();
   await loadGraphContent();
   if (selectedPath && entryExists(selectedPath, selectedType)) {
     state.selectedPath = selectedPath;
     state.selectedType = selectedType;
-  } else if (activePath && state.noteByPath.has(activePath)) {
+  } else if (activePath && entryExists(activePath, activeType)) {
     state.selectedPath = activePath;
-    state.selectedType = "note";
+    state.selectedType = activeType;
   } else {
     state.selectedPath = "";
     state.selectedType = "folder";
   }
   renderTree();
+  renderEditorTabs();
   updateGraph();
-  if (activePath && state.noteByPath.has(activePath)) await openNote(activePath, { preserveCursor: true });
+  if (activePath && entryExists(activePath, activeType)) await activateTab(activePath, activeType, { preserveCursor: true });
 }
 
 async function createNote(context = currentSelection()) {
@@ -434,9 +449,12 @@ async function renameSelectedEntry(context = currentSelection()) {
 
     if (context.type === "note" && previousActivePath === context.path) {
       await openNote(newPath);
+    } else if (context.type === "asset" && previousActivePath === context.path) {
+      await openAsset(newPath);
     } else if (context.type === "folder" && isPathInside(previousActivePath, context.path)) {
       const movedActivePath = pathAfterMove(previousActivePath, context.path, newPath);
       if (movedActivePath && state.noteByPath.has(movedActivePath)) await openNote(movedActivePath);
+      else if (movedActivePath && treeEntryExists(state.tree, movedActivePath, "asset")) await openAsset(movedActivePath);
     } else {
       selectEntry(newPath, context.type);
     }
@@ -476,7 +494,7 @@ function closeNameDialog(value) {
 }
 
 function updateMentionMenu() {
-  if (!state.activePath || document.activeElement !== els.editor) {
+  if (state.activeType !== "note" || !state.activePath || document.activeElement !== els.editor) {
     closeMentionMenu();
     return;
   }
@@ -566,7 +584,7 @@ function insertMentionLink(note) {
 }
 
 function onEditorDragOver(event) {
-  if (!state.rootPath || !state.activePath) return;
+  if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
   const hasInternalEntry = event.dataTransfer.types.includes("application/x-tektite-entry");
   if (!hasInternalEntry && !hasImageFiles(event.dataTransfer.files)) return;
   event.preventDefault();
@@ -574,7 +592,7 @@ function onEditorDragOver(event) {
 }
 
 async function onEditorDrop(event) {
-  if (!state.rootPath || !state.activePath) return;
+  if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
   const movePayload = parseMovePayload(event.dataTransfer);
   if (movePayload) {
     event.preventDefault();
@@ -705,7 +723,9 @@ async function moveTreeEntry(payload, targetFolderPath) {
     state.collapsedFolders.delete(targetFolderPath);
     await refreshVault();
     if (state.activePath && state.noteByPath.has(state.activePath)) await openNote(state.activePath);
+    else if (state.activePath && treeEntryExists(state.tree, state.activePath, "asset")) await openAsset(state.activePath);
     else if (payload.type === "note") await openNote(nextPath);
+    else if (payload.type === "asset") await openAsset(nextPath);
     else selectEntry(nextPath, payload.type);
     setSaveState("Moved");
   } catch (error) {
@@ -897,32 +917,164 @@ function getNativeTextareaPositionFromPoint(textarea, clientX, clientY) {
 async function openNote(relativePath, options = {}) {
   log("openNote", relativePath);
   if (!state.rootPath || !state.noteByPath.has(relativePath)) return;
+  ensureOpenTab(relativePath, "note");
+  await activateTab(relativePath, "note", options);
+}
+
+async function openAsset(relativePath, options = {}) {
+  log("openAsset", relativePath);
+  if (!state.rootPath || !isImagePath(relativePath) || !treeEntryExists(state.tree, relativePath, "asset")) return;
+  ensureOpenTab(relativePath, "asset");
+  await activateTab(relativePath, "asset", options);
+}
+
+async function activateTab(relativePath, type, options = {}) {
+  if (!state.rootPath || !entryExists(relativePath, type)) return;
+  if (state.activePath !== relativePath || state.activeType !== type) {
+    await flushActiveNote();
+  }
   if (!options.preservePreviewHistory) {
     state.previewHistory = [];
     state.previewForwardHistory = [];
   }
-  const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
-  const content = await window.tektite.readNote(state.rootPath, relativePath);
 
   state.activePath = relativePath;
+  state.activeType = type;
   state.selectedPath = relativePath;
-  state.selectedType = "note";
-  state.activeContent = content;
-  state.noteContent.set(relativePath, content);
-  els.editor.disabled = false;
-  els.editor.value = content;
-  els.noteTitle.textContent = state.noteByPath.get(relativePath).title;
+  state.selectedType = type;
   els.notePath.textContent = relativePath;
-  els.editor.setSelectionRange(cursor, cursor);
-  resetEditorHistory(content, cursor);
+
+  if (type === "note") {
+    const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
+    const content = state.noteContent.has(relativePath)
+      ? state.noteContent.get(relativePath)
+      : await window.tektite.readNote(state.rootPath, relativePath);
+
+    state.activeContent = content;
+    state.noteContent.set(relativePath, content);
+    els.editor.disabled = false;
+    els.editor.classList.remove("hidden");
+    els.imageViewer.classList.add("hidden");
+    els.imageViewerImage.removeAttribute("src");
+    els.editor.value = content;
+    els.noteTitle.textContent = state.noteByPath.get(relativePath).title;
+    els.editor.setSelectionRange(Math.min(cursor, content.length), Math.min(cursor, content.length));
+    resetEditorHistory(content, Math.min(cursor, content.length));
+    renderPreview(content);
+    els.editor.focus();
+  } else {
+    state.activeContent = "";
+    els.editor.disabled = true;
+    els.editor.classList.add("hidden");
+    els.imageViewer.classList.remove("hidden");
+    const dataUrl = await window.tektite.readAssetDataUrl(state.rootPath, relativePath);
+    els.imageViewerImage.src = dataUrl;
+    els.imageViewerImage.alt = relativePath.split("/").pop() || relativePath;
+    els.noteTitle.textContent = relativePath.split("/").pop() || relativePath;
+    resetEditorHistory("", 0);
+    els.preview.innerHTML = `<p class="empty-copy">${escapeHtml(relativePath)}</p><img src="${dataUrl}" alt="${escapeAttr(els.imageViewerImage.alt)}">`;
+  }
+
+  renderEditorTabs();
   renderTree();
-  renderPreview(content);
   updatePreviewNavButtons();
   updateGraph();
-  setSaveState("Saved");
+  setSaveState(type === "note" ? "Saved" : "Read-only");
+}
+
+function ensureOpenTab(path, type) {
+  const key = tabKey(path, type);
+  if (state.openTabs.some((tab) => tab.key === key)) return;
+  state.openTabs.push({
+    key,
+    path,
+    type,
+    title: tabTitle(path, type)
+  });
+}
+
+function reconcileOpenTabs() {
+  state.openTabs = state.openTabs
+    .filter((tab) => entryExists(tab.path, tab.type))
+    .map((tab) => ({ ...tab, title: tabTitle(tab.path, tab.type) }));
+
+  if (state.activePath && !entryExists(state.activePath, state.activeType)) {
+    state.activePath = null;
+    state.activeType = null;
+    state.activeContent = "";
+  }
+}
+
+function renderEditorTabs() {
+  els.editorTabs.innerHTML = "";
+  els.editorTabs.hidden = state.openTabs.length === 0;
+
+  for (const tab of state.openTabs) {
+    const button = document.createElement("button");
+    button.className = `editor-tab${tab.path === state.activePath && tab.type === state.activeType ? " active" : ""}`;
+    button.type = "button";
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", tab.path === state.activePath && tab.type === state.activeType ? "true" : "false");
+    button.title = tab.path;
+    button.innerHTML = `
+      <span aria-hidden="true">${tab.type === "note" ? "◆" : "▧"}</span>
+      <span class="editor-tab-label">${escapeHtml(tab.title)}</span>
+      <span class="editor-tab-close" role="button" aria-label="Close tab" tabindex="-1">×</span>
+    `;
+    button.addEventListener("click", (event) => {
+      if (event.target.closest(".editor-tab-close")) {
+        closeEditorTab(tab.path, tab.type);
+        return;
+      }
+      activateTab(tab.path, tab.type);
+    });
+    els.editorTabs.appendChild(button);
+  }
+}
+
+async function closeEditorTab(path, type) {
+  const closingActive = path === state.activePath && type === state.activeType;
+  if (closingActive) await flushActiveNote();
+
+  const index = state.openTabs.findIndex((tab) => tab.path === path && tab.type === type);
+  if (index < 0) return;
+  state.openTabs.splice(index, 1);
+
+  if (!closingActive) {
+    renderEditorTabs();
+    return;
+  }
+
+  const nextTab = state.openTabs[Math.min(index, state.openTabs.length - 1)];
+  if (nextTab) {
+    await activateTab(nextTab.path, nextTab.type);
+  } else {
+    showEmptyState("Select or create a note.");
+  }
+}
+
+async function flushActiveNote() {
+  if (state.activeType !== "note" || !state.activePath) return;
+  state.activeContent = els.editor.value;
+  state.noteContent.set(state.activePath, state.activeContent);
+  clearTimeout(state.saveTimer);
+  await saveActiveNote();
+}
+
+function tabKey(path, type) {
+  return `${type}:${path}`;
+}
+
+function tabTitle(path, type) {
+  if (type === "note" && state.noteByPath.has(path)) {
+    const note = state.noteByPath.get(path);
+    return state.showFileExtensions ? note.name : note.title;
+  }
+  return path.split("/").pop() || path;
 }
 
 function onEditorInput() {
+  if (state.activeType !== "note") return;
   if (state.editorHistory.restoring) return;
   state.activeContent = els.editor.value;
   renderPreview(state.activeContent);
@@ -947,7 +1099,7 @@ function resetEditorHistory(content, cursor = 0) {
 }
 
 function recordEditorHistory() {
-  if (!state.activePath || state.editorHistory.restoring) return;
+  if (state.activeType !== "note" || !state.activePath || state.editorHistory.restoring) return;
   if (state.editorHistory.path !== state.activePath) {
     resetEditorHistory(els.editor.value, els.editor.selectionStart);
     return;
@@ -972,7 +1124,7 @@ function recordEditorHistory() {
 }
 
 function restoreEditorHistory(delta) {
-  if (!state.activePath || state.editorHistory.path !== state.activePath) return;
+  if (state.activeType !== "note" || !state.activePath || state.editorHistory.path !== state.activePath) return;
   const nextIndex = state.editorHistory.index + delta;
   if (nextIndex < 0 || nextIndex >= state.editorHistory.stack.length) return;
 
@@ -1023,7 +1175,8 @@ function onEditorKeydown(event) {
 }
 
 async function saveActiveNote() {
-  if (!state.rootPath || !state.activePath) return;
+  if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
+  state.activeContent = els.editor.value;
   setSaveState("Saving...");
   await window.tektite.writeNote(state.rootPath, state.activePath, state.activeContent);
   state.noteContent.set(state.activePath, state.activeContent);
@@ -1032,21 +1185,29 @@ async function saveActiveNote() {
   state.tree = vault.tree;
   state.notes = vault.notes;
   indexNotes();
+  reconcileOpenTabs();
+  renderEditorTabs();
   renderTree();
   updateGraph();
 }
 
 function showEmptyState(message = "Choose a local folder to start.") {
   state.activePath = null;
+  state.activeType = null;
   state.activeContent = "";
+  state.openTabs = [];
   state.previewHistory = [];
   state.previewForwardHistory = [];
   els.editor.value = "";
   els.editor.disabled = true;
+  els.editor.classList.remove("hidden");
+  els.imageViewer.classList.add("hidden");
+  els.imageViewerImage.removeAttribute("src");
   resetEditorHistory("", 0);
   els.noteTitle.textContent = "Open a vault";
   els.notePath.textContent = message;
   els.preview.innerHTML = `<p class="empty-copy">${escapeHtml(message)}</p>`;
+  renderEditorTabs();
   updatePreviewNavButtons();
   updateGraph();
 }
@@ -1126,7 +1287,7 @@ function renderTreeNode(node, query) {
     button.innerHTML = `<span class="tree-kind-icon" aria-hidden="true">${node.type === "note" ? "◆" : "▧"}</span><span class="tree-label">${escapeHtml(label)}</span>`;
     button.addEventListener("click", () => {
       if (node.type === "note") openNote(node.path);
-      else selectEntry(node.path, "asset");
+      else openAsset(node.path);
     });
     return button;
   }
@@ -1801,7 +1962,7 @@ function onPreviewClick(event) {
 
 function openNoteFromPreviewLink(notePath) {
   if (!notePath || notePath === state.activePath || !state.noteByPath.has(notePath)) return;
-  if (state.activePath) {
+  if (state.activePath && state.activeType === "note") {
     const lastPath = state.previewHistory[state.previewHistory.length - 1];
     if (lastPath !== state.activePath) state.previewHistory.push(state.activePath);
   }
@@ -1812,14 +1973,14 @@ function openNoteFromPreviewLink(notePath) {
 function goBackPreviewHistory() {
   const previousPath = state.previewHistory.pop();
   if (!previousPath) return updatePreviewNavButtons();
-  if (state.activePath) state.previewForwardHistory.push(state.activePath);
+  if (state.activePath && state.activeType === "note") state.previewForwardHistory.push(state.activePath);
   openNote(previousPath, { preservePreviewHistory: true });
 }
 
 function goForwardPreviewHistory() {
   const nextPath = state.previewForwardHistory.pop();
   if (!nextPath) return updatePreviewNavButtons();
-  if (state.activePath) state.previewHistory.push(state.activePath);
+  if (state.activePath && state.activeType === "note") state.previewHistory.push(state.activePath);
   openNote(nextPath, { preservePreviewHistory: true });
 }
 
@@ -1860,7 +2021,7 @@ function currentSelection() {
     return { path: state.selectedPath, type: state.selectedType };
   }
   if (state.activePath) {
-    return { path: state.activePath, type: "note" };
+    return { path: state.activePath, type: state.activeType || "note" };
   }
   return { path: "", type: "folder" };
 }
