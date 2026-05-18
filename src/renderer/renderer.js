@@ -393,7 +393,6 @@ async function createFolder(context = currentSelection()) {
     const newPath = await window.tektite.createFolder(state.rootPath, requestedName, folderForContext(context));
     state.collapsedFolders.delete(parentFolder(newPath));
     await refreshVault();
-    selectEntry(newPath, "folder");
     log("createFolder complete", newPath);
   } catch (error) {
     console.error("[tektite:renderer] createFolder failed", error);
@@ -456,7 +455,7 @@ async function renameSelectedEntry(context = currentSelection()) {
       if (movedActivePath && state.noteByPath.has(movedActivePath)) await openNote(movedActivePath);
       else if (movedActivePath && treeEntryExists(state.tree, movedActivePath, "asset")) await openAsset(movedActivePath);
     } else {
-      selectEntry(newPath, context.type);
+      if (context.type !== "folder") selectEntry(newPath, context.type);
     }
     setSaveState("Renamed");
   } catch (error) {
@@ -717,8 +716,8 @@ async function moveTreeEntry(payload, targetFolderPath) {
       state.activePath = `${nextPath}${originalActivePath.slice(payload.path.length)}`;
     }
     if (state.selectedPath === payload.path) {
-      state.selectedPath = nextPath;
-      state.selectedType = payload.type;
+      state.selectedPath = payload.type === "folder" ? "" : nextPath;
+      state.selectedType = payload.type === "folder" ? "folder" : payload.type;
     }
     state.collapsedFolders.delete(targetFolderPath);
     await refreshVault();
@@ -726,7 +725,7 @@ async function moveTreeEntry(payload, targetFolderPath) {
     else if (state.activePath && treeEntryExists(state.tree, state.activePath, "asset")) await openAsset(state.activePath);
     else if (payload.type === "note") await openNote(nextPath);
     else if (payload.type === "asset") await openAsset(nextPath);
-    else selectEntry(nextPath, payload.type);
+    else if (payload.type !== "folder") selectEntry(nextPath, payload.type);
     setSaveState("Moved");
   } catch (error) {
     console.error("[tektite:renderer] moveTreeEntry failed", error);
@@ -1262,12 +1261,12 @@ function renderTree() {
 
 function renderVaultRootDropRow() {
   const button = document.createElement("button");
-  button.className = `tree-row vault-root-row${isSelected("", "folder") ? " selected" : ""}`;
+  button.className = "tree-row vault-root-row";
   button.type = "button";
   button.dataset.path = "";
   button.dataset.type = "folder";
   button.innerHTML = `<span aria-hidden="true">⌂</span><span class="tree-label">${escapeHtml(state.tree.name || "Vault")}</span>`;
-  button.addEventListener("click", () => selectEntry("", "folder"));
+  button.addEventListener("click", () => toggleFolder(""));
   return button;
 }
 
@@ -1304,7 +1303,6 @@ function renderTreeNode(node, query) {
   header.draggable = Boolean(node.path);
   header.dataset.path = node.path;
   header.dataset.type = "folder";
-  if (isSelected(node.path, "folder")) header.classList.add("selected");
 
   const toggle = document.createElement("button");
   toggle.className = "tree-caret-button";
@@ -1317,7 +1315,7 @@ function renderTreeNode(node, query) {
   label.className = "tree-label-button";
   label.type = "button";
   label.innerHTML = `<span class="tree-kind-icon tree-folder-icon" aria-hidden="true">▣</span><span class="tree-label">${escapeHtml(node.name)}</span>`;
-  label.addEventListener("click", () => selectEntry(node.path, "folder"));
+  label.addEventListener("click", () => toggleFolder(node.path));
 
   header.append(toggle, label);
   const children = document.createElement("div");
@@ -1331,7 +1329,7 @@ function renderTreeNode(node, query) {
 function onTreeContextMenu(event) {
   event.preventDefault();
   const context = contextFromTreeTarget(event.target);
-  selectEntry(context.path, context.type);
+  if (context.type !== "folder") selectEntry(context.path, context.type);
   openTreeContextMenu(event.clientX, event.clientY, context);
 }
 
@@ -1400,6 +1398,7 @@ function closeTreeContextMenu() {
 }
 
 function toggleFolder(folderPath) {
+  if (!folderPath) return;
   if (state.collapsedFolders.has(folderPath)) {
     state.collapsedFolders.delete(folderPath);
   } else {
