@@ -413,11 +413,45 @@ async function deleteSelectedEntry(context = currentSelection()) {
   }
 }
 
-function openNameDialog({ title, defaultName }) {
+async function renameSelectedEntry(context = currentSelection()) {
+  if (!state.rootPath || !context?.path) return;
+
+  const currentName = context.path.split("/").pop() || context.path;
+  const defaultName = context.type === "note" ? currentName.replace(/\.md$/i, "") : currentName;
+  const requestedName = await openNameDialog({
+    title: context.type === "folder" ? "Rename folder" : "Rename file",
+    defaultName,
+    confirmLabel: "Rename"
+  });
+  if (requestedName === null) return;
+
+  try {
+    if (state.activePath) await saveActiveNote();
+    clearTimeout(state.saveTimer);
+    const newPath = await window.tektite.renameEntry(state.rootPath, context.path, context.type, requestedName);
+    const previousActivePath = state.activePath;
+    await refreshVault();
+
+    if (context.type === "note" && previousActivePath === context.path) {
+      await openNote(newPath);
+    } else if (context.type === "folder" && isPathInside(previousActivePath, context.path)) {
+      const movedActivePath = pathAfterMove(previousActivePath, context.path, newPath);
+      if (movedActivePath && state.noteByPath.has(movedActivePath)) await openNote(movedActivePath);
+    } else {
+      selectEntry(newPath, context.type);
+    }
+    setSaveState("Renamed");
+  } catch (error) {
+    console.error("[tektite:renderer] renameSelectedEntry failed", error);
+    setSaveState("Failed");
+  }
+}
+
+function openNameDialog({ title, defaultName, confirmLabel = "Create" }) {
   return new Promise((resolve) => {
     state.nameDialogResolve = resolve;
     els.nameDialogTitle.textContent = title;
-    els.confirmNameButton.textContent = "Create";
+    els.confirmNameButton.textContent = confirmLabel;
     els.nameInput.value = defaultName;
     els.nameDialog.classList.remove("hidden");
     requestAnimationFrame(() => {
@@ -678,6 +712,12 @@ async function moveTreeEntry(payload, targetFolderPath) {
     console.error("[tektite:renderer] moveTreeEntry failed", error);
     setSaveState("Failed");
   }
+}
+
+function pathAfterMove(originalPath, oldBasePath, newBasePath) {
+  if (!originalPath || !oldBasePath || originalPath === oldBasePath) return newBasePath;
+  if (!originalPath.startsWith(`${oldBasePath}/`)) return originalPath;
+  return `${newBasePath}${originalPath.slice(oldBasePath.length)}`;
 }
 
 function parseMovePayload(dataTransfer) {
@@ -1158,6 +1198,10 @@ function openTreeContextMenu(x, y, context) {
   if (context.path) {
     items.push({ type: "separator" });
     items.push({
+      label: context.type === "folder" ? "Rename folder" : "Rename file",
+      action: () => renameSelectedEntry(context)
+    });
+    items.push({
       label: context.type === "folder" ? "Delete folder" : "Delete file",
       danger: true,
       action: () => deleteSelectedEntry(context)
@@ -1599,17 +1643,20 @@ function drawGraph({ nodes, edges }) {
     group.setAttribute("class", "graph-node");
     group.style.cursor = "pointer";
 
+    const nodeRadius = graphNodeRadius(node);
+    const labelOffset = nodeRadius + 8;
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", node.x);
     circle.setAttribute("cy", node.y);
-    circle.setAttribute("r", 8 + Math.min(node.degree, 8) * 1.6);
+    circle.setAttribute("r", nodeRadius);
     circle.setAttribute("fill", node.active ? accent : graphNode);
     circle.setAttribute("stroke", node.active ? accentDark : accent);
     circle.setAttribute("stroke-width", node.active ? "3" : "2");
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    label.setAttribute("x", node.x + 13);
+    label.setAttribute("x", node.x + labelOffset);
     label.setAttribute("y", node.y + 4);
+    label.dataset.offsetX = String(labelOffset);
     label.setAttribute("fill", ink);
     label.setAttribute("font-size", "12");
     label.setAttribute("font-weight", node.active ? "700" : "560");
@@ -1621,6 +1668,10 @@ function drawGraph({ nodes, edges }) {
 
   viewportLayer.append(edgeLayer, nodeLayer);
   svg.append(viewportLayer);
+}
+
+function graphNodeRadius(node) {
+  return 8 + Math.min(node.degree, 8) * 1.6;
 }
 
 function onGraphWheel(event) {
@@ -1718,8 +1769,11 @@ function moveGraphNodeElement(notePath, x, y) {
   const label = group.querySelector("text");
   circle?.setAttribute("cx", x);
   circle?.setAttribute("cy", y);
-  label?.setAttribute("x", x + 13);
-  label?.setAttribute("y", y + 4);
+  if (label) {
+    const offsetX = Number(label.dataset.offsetX) || 13;
+    label.setAttribute("x", x + offsetX);
+    label.setAttribute("y", y + 4);
+  }
 
   els.graphSvg.querySelectorAll(`[data-source="${cssEscape(notePath)}"]`).forEach((line) => {
     line.setAttribute("x1", x);

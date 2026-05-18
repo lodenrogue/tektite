@@ -361,6 +361,35 @@ ipcMain.handle("entry:delete", async (_event, rootPath, relativePath, type) => {
   return true;
 });
 
+ipcMain.handle("entry:rename", async (_event, rootPath, relativePath, type, requestedName) => {
+  log("entry:rename", { relativePath, type, requestedName });
+  const normalized = normalizeRelative(relativePath);
+  if (!normalized) throw new Error("Cannot rename the vault root.");
+
+  const fromPath = resolveVaultPath(rootPath, normalized);
+  const stat = await fs.stat(fromPath);
+  if (type === "folder" && !stat.isDirectory()) throw new Error("Selected entry is not a folder.");
+  if ((type === "note" || type === "asset") && !stat.isFile()) throw new Error("Selected entry is not a file.");
+
+  const currentName = path.basename(normalized);
+  const nextName = renamedEntryName(currentName, requestedName, type);
+  if (!nextName || nextName === currentName) return normalized;
+
+  const candidate = path.posix.join(parentPosix(normalized), nextName);
+  const toPath = resolveVaultPath(rootPath, candidate);
+  if (await exists(toPath)) throw new Error(`"${nextName}" already exists.`);
+
+  await fs.rename(fromPath, toPath);
+  if (type === "asset" && imageExtensions.has(path.extname(candidate).toLowerCase())) {
+    await updateMovedAssetReferences(rootPath, normalized, candidate);
+  } else if (type === "note") {
+    await updateMovedNoteReferences(rootPath, normalized, candidate);
+  } else if (type === "folder") {
+    await updateMovedFolderReferences(rootPath, normalized, candidate);
+  }
+  return candidate;
+});
+
 ipcMain.handle("entry:move", async (_event, rootPath, relativePath, type, targetFolder = "") => {
   log("entry:move", { relativePath, type, targetFolder });
   const normalized = normalizeRelative(relativePath);
@@ -394,6 +423,10 @@ ipcMain.handle("entry:move", async (_event, rootPath, relativePath, type, target
   await fs.rename(fromPath, toPath);
   if (type === "asset" && imageExtensions.has(path.extname(candidate).toLowerCase())) {
     await updateMovedAssetReferences(rootPath, normalized, candidate);
+  } else if (type === "note") {
+    await updateMovedNoteReferences(rootPath, normalized, candidate);
+  } else if (type === "folder") {
+    await updateMovedFolderReferences(rootPath, normalized, candidate);
   }
   return candidate;
 });
@@ -500,6 +533,36 @@ async function updateMovedAssetReferences(rootPath, oldAssetPath, newAssetPath) 
   }
 }
 
+async function updateMovedNoteReferences(rootPath, oldNotePath, newNotePath) {
+  const tree = await readDirectory(rootPath, rootPath);
+  const notes = flattenNotes(tree);
+
+  for (const note of notes) {
+    const notePath = resolveVaultPath(rootPath, note.path);
+    const original = await fs.readFile(notePath, "utf8");
+    let updated = rewriteAssetLinks(original, note.path, oldNotePath, newNotePath);
+    updated = rewriteWikiNoteLinks(updated, note.path, oldNotePath, newNotePath);
+    if (updated !== original) {
+      await fs.writeFile(notePath, updated, "utf8");
+    }
+  }
+}
+
+async function updateMovedFolderReferences(rootPath, oldFolderPath, newFolderPath) {
+  const tree = await readDirectory(rootPath, rootPath);
+  const notes = flattenNotes(tree);
+
+  for (const note of notes) {
+    const notePath = resolveVaultPath(rootPath, note.path);
+    const original = await fs.readFile(notePath, "utf8");
+    let updated = rewriteFolderMarkdownLinks(original, note.path, oldFolderPath, newFolderPath);
+    updated = rewriteFolderWikiLinks(updated, note.path, oldFolderPath, newFolderPath);
+    if (updated !== original) {
+      await fs.writeFile(notePath, updated, "utf8");
+    }
+  }
+}
+
 function rewriteAssetLinks(markdown, notePath, oldAssetPath, newAssetPath) {
   return markdown.replace(/(!?\[[^\]]*\]\()([^)]+)(\))/g, (match, prefix, href, suffix) => {
     const decodedHref = decodeMarkdownLink(href);
@@ -511,6 +574,78 @@ function rewriteAssetLinks(markdown, notePath, oldAssetPath, newAssetPath) {
     const nextHref = encodeMarkdownLink(relativeMarkdownPath(notePath, newAssetPath));
     return `${prefix}${nextHref}${suffix}`;
   });
+}
+
+function rewriteFolderMarkdownLinks(markdown, notePath, oldFolderPath, newFolderPath) {
+  return markdown.replace(/(!?\[[^\]]*\]\()([^)]+)(\))/g, (match, prefix, href, suffix) => {
+    const decodedHref = decodeMarkdownLink(href);
+    if (/^[a-z]+:\/\//i.test(decodedHref)) return match;
+
+    const resolved = resolveMarkdownReference(notePath, decodedHref);
+    const moved = movedPathInsideFolder(resolved, oldFolderPath, newFolderPath);
+    if (!moved) return match;
+
+    const nextHref = encodeMarkdownLink(relativeMarkdownPath(notePath, moved));
+    return `${prefix}${nextHref}${suffix}`;
+  });
+}
+
+function rewriteWikiNoteLinks(markdown, notePath, oldNotePath, newNotePath) {
+  return markdown.replace(/\[\[([^\]]+)\]\]/g, (match, target) => {
+    const pipeIndex = target.indexOf("|");
+    const targetPart = pipeIndex >= 0 ? target.slice(0, pipeIndex) : target;
+    const aliasPart = pipeIndex >= 0 ? target.slice(pipeIndex) : "";
+    const headingIndex = targetPart.indexOf("#");
+    const pathPart = headingIndex >= 0 ? targetPart.slice(0, headingIndex) : targetPart;
+    const headingPart = headingIndex >= 0 ? targetPart.slice(headingIndex) : "";
+
+    if (resolveWikiReference(notePath, pathPart) !== oldNotePath) return match;
+
+    const nextTarget = wikiTargetFor(notePath, pathPart, newNotePath);
+    return `[[${nextTarget}${headingPart}${aliasPart}]]`;
+  });
+}
+
+function rewriteFolderWikiLinks(markdown, notePath, oldFolderPath, newFolderPath) {
+  return markdown.replace(/\[\[([^\]]+)\]\]/g, (match, target) => {
+    const pipeIndex = target.indexOf("|");
+    const targetPart = pipeIndex >= 0 ? target.slice(0, pipeIndex) : target;
+    const aliasPart = pipeIndex >= 0 ? target.slice(pipeIndex) : "";
+    const headingIndex = targetPart.indexOf("#");
+    const pathPart = headingIndex >= 0 ? targetPart.slice(0, headingIndex) : targetPart;
+    const headingPart = headingIndex >= 0 ? targetPart.slice(headingIndex) : "";
+    const resolved = resolveWikiReference(notePath, pathPart);
+    const moved = movedPathInsideFolder(resolved, oldFolderPath, newFolderPath);
+    if (!moved) return match;
+
+    const nextTarget = wikiTargetFor(notePath, pathPart, moved);
+    return `[[${nextTarget}${headingPart}${aliasPart}]]`;
+  });
+}
+
+function movedPathInsideFolder(resolvedPath, oldFolderPath, newFolderPath) {
+  if (!resolvedPath || resolvedPath === oldFolderPath) return "";
+  if (!resolvedPath.startsWith(`${oldFolderPath}/`)) return "";
+  return `${newFolderPath}${resolvedPath.slice(oldFolderPath.length)}`;
+}
+
+function resolveWikiReference(notePath, target) {
+  const clean = decodeMarkdownLink(target).trim().replace(/^\/+/, "");
+  if (!clean) return "";
+  const candidates = path.extname(clean) ? [clean] : [`${clean}.md`, clean];
+  for (const candidate of candidates) {
+    const resolved = resolveMarkdownReference(notePath, candidate);
+    if (resolved) return resolved;
+  }
+  return "";
+}
+
+function wikiTargetFor(notePath, oldTarget, newNotePath) {
+  const relative = relativeMarkdownPath(notePath, newNotePath).replace(/\.md$/i, "");
+  if (oldTarget.includes("/") || oldTarget.startsWith(".") || oldTarget.startsWith("/")) {
+    return relative.replace(/^\.\//, "");
+  }
+  return path.basename(newNotePath, path.extname(newNotePath));
 }
 
 function resolveMarkdownReference(notePath, href) {
@@ -569,6 +704,25 @@ function noteTitle(relativePath) {
 
 function sanitizeNoteName(value) {
   return sanitizeEntryName(value, "Untitled").replace(/\.md$/i, "") || "Untitled";
+}
+
+function renamedEntryName(currentName, requestedName, type) {
+  if (type === "folder") return sanitizeEntryName(requestedName || currentName, currentName);
+
+  const currentExtension = path.extname(currentName);
+  const fallback = path.basename(currentName, currentExtension);
+  const requested = sanitizeEntryName(requestedName || fallback, fallback);
+  const requestedExtension = path.extname(requested);
+
+  if (type === "note") {
+    return `${requested.replace(/\.md$/i, "") || fallback}.md`;
+  }
+
+  if (requestedExtension && imageExtensions.has(requestedExtension.toLowerCase())) {
+    return requested;
+  }
+
+  return `${requested.replace(/\.[^.]+$/, "") || fallback}${currentExtension}`;
 }
 
 function sanitizeEntryName(value, fallback) {

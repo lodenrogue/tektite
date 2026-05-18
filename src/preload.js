@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("folder:create", rootPath, requestedName, parentFolder),
   deleteEntry: (rootPath, relativePath, type) =>
     ipcRenderer.invoke("entry:delete", rootPath, relativePath, type),
+  renameEntry: (rootPath, relativePath, type, requestedName) =>
+    ipcRenderer.invoke("entry:rename", rootPath, relativePath, type, requestedName),
   moveEntry: (rootPath, relativePath, type, targetFolder) =>
     ipcRenderer.invoke("entry:move", rootPath, relativePath, type, targetFolder),
   importImage: (rootPath, sourcePath, targetFolder) =>

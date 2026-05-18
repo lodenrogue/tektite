@@ -48,20 +48,9 @@ npm run dev
 
 In dev mode on macOS, the host process may still appear as Electron.
 
-## Icon Tools
-
-Generate app icons from the current source image:
-
-```sh
-./make_rounded_icon.sh Gemini_Generated_Image_825sfh825sfh825s.png assets/icons/tektite-icon.icns
-```
-
-The script creates a rounded macOS `.icns` file from a PNG source. The app also uses `assets/icons/tektite-icon.png`, `assets/icons/tektite.iconset`, and `tektive-icon.webp` for runtime and packaging assets.
-
 ## Packaging
 
 ```sh
-npm run generate-icons
 npm run package:mac
 npm run package:linux
 ```
@@ -74,4 +63,4 @@ Tektite was created by Mathias Conradt.
 
 Copyright © 2026 Mathias Conradt.
 
-Released under the MIT License.
+Released under the Apache License 2.0.

@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node scripts/start.js",
     "dev": "electron .",
-    "generate-icons": "node scripts/generate-icons.js",
     "package:mac": "electron-packager . Tektite --platform=darwin --icon=assets/icons/tektite-icon.icns --overwrite",
     "package:linux": "electron-packager . Tektite --platform=linux --icon=assets/icons/tektite-icon.png --overwrite"
   },
@@ -18,10 +17,9 @@
     "desktop"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@electron/packager": "^20.0.0",
-    "electron": "^42.1.0",
-    "sharp": "^0.34.5"
+    "electron": "^42.1.0"
   }
 }
