@@ -12,6 +12,12 @@ cask "tektite" do
 
   app "Tektite.app"
 
+  preflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-cr", "#{staged_path}/Tektite.app"],
+                   sudo: false
+  end
+
   zap trash: [
     "~/Library/Application Support/Tektite",
     "~/Library/Preferences/com.electron.tektite.plist",

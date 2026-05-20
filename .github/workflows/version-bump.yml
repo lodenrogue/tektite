@@ -62,6 +62,7 @@ jobs:
           npm version patch --no-git-tag-version
           version="$(node -p "require('./package.json').version")"
           ruby -0pi -e "gsub(/version \"[^\"]+\"/, 'version \"' + '${version}' + '\"')" Casks/tektite.rb
+          ruby -0pi -e "gsub(/<span id=\"version\">[^<]+<\\/span>/, '<span id=\"version\">' + '${version}' + '<\\/span>')" src/about.html
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Commit version bump and tag release
@@ -70,7 +71,7 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json Casks/tektite.rb
+          git add package.json package-lock.json Casks/tektite.rb src/about.html
           git commit -m "chore: bump version to ${version}"
           git tag "v${version}"
           git push origin HEAD:main

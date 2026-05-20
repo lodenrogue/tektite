@@ -1601,13 +1601,14 @@ function inlineMarkdown(value, sourcePath = "") {
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
     const decoded = decodeLink(href);
     const note = resolveNote(decoded, sourcePath);
+    const linkLabel = restore(tokens, label);
     if (note) {
-      return stash(tokens, `<a href="#" data-note-path="${escapeAttr(note.path)}">${label}</a>`);
+      return stash(tokens, `<a href="#" data-note-path="${escapeAttr(note.path)}">${linkLabel}</a>`);
     }
     if (/^https?:\/\//i.test(decoded)) {
-      return stash(tokens, `<a href="${escapeAttr(decoded)}" target="_blank" rel="noreferrer">${label}</a>`);
+      return stash(tokens, `<a href="${escapeAttr(decoded)}" target="_blank" rel="noreferrer">${linkLabel}</a>`);
     }
-    return stash(tokens, `<span class="wiki-link missing">${label}</span>`);
+    return stash(tokens, `<span class="wiki-link missing">${linkLabel}</span>`);
   });
 
   text = text.replace(/\[\[([^\]]+)\]\]/g, (_match, target) => {
