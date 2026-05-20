@@ -91,3 +91,5 @@ Tektite was created by Mathias Conradt.
 Copyright © 2026 Mathias Conradt.
 
 Released under the Apache License 2.0.
+
+See [NOTICE.md](NOTICE.md) for third-party notices.

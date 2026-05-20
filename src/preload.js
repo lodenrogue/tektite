@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("asset:import-image", rootPath, sourcePath, targetFolder),
   readAssetDataUrl: (rootPath, relativePath) =>
     ipcRenderer.invoke("asset:read-data-url", rootPath, relativePath),
+  loadWorkspaceState: (rootPath) => ipcRenderer.invoke("workspace:load", rootPath),
+  saveWorkspaceState: (rootPath, workspace) => ipcRenderer.invoke("workspace:save", rootPath, workspace),
   getFilePath: (file) => webUtils.getPathForFile(file),
   onOpenVault: (callback) => ipcRenderer.on("menu:open-vault", callback),
   onOpenRecentVault: (callback) =>

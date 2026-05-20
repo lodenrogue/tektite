@@ -218,10 +218,11 @@ body.resizing-y textarea {
 .icon-button {
   position: relative;
   display: inline-grid;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
   place-items: center;
+  padding: 6px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel);
@@ -237,6 +238,37 @@ body.resizing-y textarea {
 .icon-button:disabled {
   cursor: default;
   opacity: 0.42;
+}
+
+.toolbar-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.toolbar-icon-folder {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+
+.theme-icon {
+  display: grid;
+  place-items: center;
+}
+
+.theme-icon .toolbar-icon {
+  grid-area: 1 / 1;
+}
+
+.theme-icon[data-mode="dark"] .theme-icon-moon,
+.theme-icon[data-mode="light"] .theme-icon-sun {
+  display: none;
 }
 
 .header-actions .icon-button::after {
@@ -294,6 +326,7 @@ body.resizing-y textarea {
 #suffixIcon {
   font-size: 11px;
   font-weight: 760;
+  letter-spacing: 0;
 }
 
 .danger-button {
@@ -330,7 +363,7 @@ body.resizing-y textarea {
 
 .tree-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   width: 100%;
   min-height: 30px;
@@ -369,14 +402,26 @@ button.tree-row {
 
 .tree-kind-icon {
   display: inline-grid;
-  width: 18px;
-  margin-right: 4px;
-  justify-content: center;
+  width: 20px;
+  height: 20px;
+  place-items: center;
   color: var(--muted);
 }
 
-.tree-folder-icon {
-  margin-right: 6px;
+.tree-kind-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.tree-kind-icon:not(.tree-folder-icon) svg {
+  width: 17px;
+  height: 17px;
 }
 
 .tree-row.selected .tree-kind-icon,
@@ -408,7 +453,7 @@ button.tree-row {
 
 .tree-label-button {
   justify-content: stretch;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr);
 }
 
 .tree-children {

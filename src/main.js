@@ -159,6 +159,28 @@ function recentVaultsPath() {
   return path.join(app.getPath("userData"), "recent-vaults.json");
 }
 
+function workspaceStatePath() {
+  return path.join(app.getPath("userData"), "workspace-state.json");
+}
+
+async function loadWorkspaceStore() {
+  try {
+    const raw = await fs.readFile(workspaceStatePath(), "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      lastVault: typeof parsed.lastVault === "string" ? parsed.lastVault : null,
+      workspaces: parsed.workspaces && typeof parsed.workspaces === "object" ? parsed.workspaces : {}
+    };
+  } catch {
+    return { lastVault: null, workspaces: {} };
+  }
+}
+
+async function saveWorkspaceStore(store) {
+  await fs.mkdir(path.dirname(workspaceStatePath()), { recursive: true });
+  await fs.writeFile(workspaceStatePath(), JSON.stringify(store, null, 2), "utf8");
+}
+
 function buildMenu() {
   const isMac = process.platform === "darwin";
   const recentVaultItems = recentVaults.length > 0
@@ -285,6 +307,25 @@ ipcMain.handle("vault:scan", async (_event, rootPath) => {
   await rememberRecentVault(rootPath);
   log("vault:scan complete", { rootPath, notes: notes.length });
   return { rootPath, tree, notes };
+});
+
+ipcMain.handle("workspace:load", async (_event, rootPath = "") => {
+  const store = await loadWorkspaceStore();
+  const normalizedRoot = typeof rootPath === "string" && rootPath ? path.resolve(rootPath) : "";
+  return {
+    lastVault: store.lastVault || recentVaults[0] || null,
+    workspace: normalizedRoot ? store.workspaces[normalizedRoot] || null : null
+  };
+});
+
+ipcMain.handle("workspace:save", async (_event, rootPath, workspace) => {
+  if (typeof rootPath !== "string" || !rootPath) return false;
+  const normalizedRoot = path.resolve(rootPath);
+  const store = await loadWorkspaceStore();
+  store.lastVault = normalizedRoot;
+  store.workspaces[normalizedRoot] = workspace && typeof workspace === "object" ? workspace : {};
+  await saveWorkspaceStore(store);
+  return true;
 });
 
 ipcMain.handle("note:read", async (_event, rootPath, relativePath) => {

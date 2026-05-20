@@ -47,6 +47,8 @@ const state = {
   }
 };
 
+const WORKSPACE_STORAGE_PREFIX = "tektite:workspace:";
+
 const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
   localStorage.getItem("tektite:verbose") === "1";
 
@@ -145,17 +147,27 @@ function boot() {
     applyLayout();
     updateGraph();
   });
+  globalThis.addEventListener("beforeunload", saveWorkspaceState);
 
   globalThis.tektite.onOpenVault(chooseVault);
   globalThis.tektite.onOpenRecentVault(openVault);
   globalThis.tektite.onNewNote(createNote);
 
-  const lastVault = localStorage.getItem("tektite:lastVault");
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
-  if (lastVault) openVault(lastVault).catch(() => {
+  restoreLastVault().catch(() => showEmptyState());
+}
+
+async function restoreLastVault() {
+  const persisted = await globalThis.tektite.loadWorkspaceState("");
+  const lastVault = persisted?.lastVault || localStorage.getItem("tektite:lastVault");
+  if (!lastVault) return;
+
+  try {
+    await openVault(lastVault);
+  } catch {
     localStorage.removeItem("tektite:lastVault");
     showEmptyState();
-  });
+  }
 }
 
 function loadLayout() {
@@ -251,7 +263,7 @@ function applyTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
   document.documentElement.dataset.theme = nextTheme;
   localStorage.setItem("tektite:theme", nextTheme);
-  els.themeIcon.textContent = nextTheme === "dark" ? "☀" : "☾";
+  els.themeIcon.dataset.mode = nextTheme;
   const label = nextTheme === "dark" ? "Light Mode" : "Dark Mode";
   els.themeButton.dataset.tooltip = label;
   els.themeButton.setAttribute("aria-label", label);
@@ -307,7 +319,9 @@ async function openVault(rootPath) {
     updateGraph();
 
     renderEditorTabs();
-    if (state.notes.length > 0) {
+    if (await restoreWorkspaceState()) {
+      setSaveState(state.activeType === "asset" ? "Read-only" : "Saved");
+    } else if (state.notes.length > 0) {
       await openNote(state.notes[0].path);
     } else {
       showEmptyState("Create a note to start writing.");
@@ -1008,6 +1022,7 @@ async function activateTab(relativePath, type, options = {}) {
   updatePreviewNavButtons();
   updateGraph();
   setSaveState(type === "note" ? "Saved" : "Read-only");
+  saveWorkspaceState();
 }
 
 function ensureOpenTab(path, type) {
@@ -1070,6 +1085,7 @@ async function closeEditorTab(path, type) {
 
   if (!closingActive) {
     renderEditorTabs();
+    saveWorkspaceState();
     return;
   }
 
@@ -1080,6 +1096,7 @@ async function closeEditorTab(path, type) {
   } else {
     showEmptyState("Select or create a note.");
   }
+  saveWorkspaceState();
 }
 
 async function flushActiveNote() {
@@ -1239,6 +1256,84 @@ function showEmptyState(message = "Choose a local folder to start.") {
   renderEditorTabs();
   updatePreviewNavButtons();
   updateGraph();
+  saveWorkspaceState();
+}
+
+async function restoreWorkspaceState() {
+  const workspace = await loadWorkspaceState();
+  if (!workspace) return false;
+
+  const tabs = sanitizeSavedTabs(workspace.openTabs);
+  if (tabs.length === 0) return false;
+
+  state.openTabs = tabs.map((tab) => ({
+    key: tabKey(tab.path, tab.type),
+    path: tab.path,
+    type: tab.type,
+    title: tabTitle(tab.path, tab.type)
+  }));
+
+  const active = tabs.find((tab) => tab.path === workspace.activePath && tab.type === workspace.activeType) || tabs[0];
+  await activateTab(active.path, active.type, { preserveCursor: true });
+  return true;
+}
+
+async function loadWorkspaceState() {
+  if (!state.rootPath) return null;
+  try {
+    const persisted = await globalThis.tektite.loadWorkspaceState(state.rootPath);
+    if (persisted?.workspace && typeof persisted.workspace === "object") return persisted.workspace;
+  } catch (error) {
+    console.warn("[tektite:renderer] workspace state load failed", error);
+  }
+
+  try {
+    const workspace = JSON.parse(localStorage.getItem(workspaceStorageKey()) || "null");
+    if (!workspace || typeof workspace !== "object") return null;
+    return workspace;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeSavedTabs(tabs) {
+  if (!Array.isArray(tabs)) return [];
+
+  const seen = new Set();
+  return tabs
+    .filter((tab) => tab && typeof tab.path === "string" && (tab.type === "note" || tab.type === "asset"))
+    .filter((tab) => entryExists(tab.path, tab.type))
+    .filter((tab) => {
+      const key = tabKey(tab.path, tab.type);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function saveWorkspaceState() {
+  if (!state.rootPath) return;
+
+  const tabs = state.openTabs
+    .filter((tab) => entryExists(tab.path, tab.type))
+    .map((tab) => ({ path: tab.path, type: tab.type }));
+
+  const workspace = {
+    openTabs: tabs,
+    activePath: state.activePath,
+    activeType: state.activeType,
+    selectedPath: state.selectedPath,
+    selectedType: state.selectedType
+  };
+
+  localStorage.setItem(workspaceStorageKey(), JSON.stringify(workspace));
+  globalThis.tektite.saveWorkspaceState(state.rootPath, workspace).catch((error) => {
+    console.warn("[tektite:renderer] workspace state save failed", error);
+  });
+}
+
+function workspaceStorageKey() {
+  return `${WORKSPACE_STORAGE_PREFIX}${state.rootPath}`;
 }
 
 function indexNotes() {
@@ -1295,9 +1390,19 @@ function renderVaultRootDropRow() {
   button.type = "button";
   button.dataset.path = "";
   button.dataset.type = "folder";
-  button.innerHTML = `<span aria-hidden="true">⌂</span><span class="tree-label">${escapeHtml(state.tree.name || "Vault")}</span>`;
+  button.innerHTML = `${treeIconSvg("folder")}<span class="tree-label">${escapeHtml(state.tree.name || "Vault")}</span>`;
   button.addEventListener("click", () => toggleFolder(""));
   return button;
+}
+
+function treeIconSvg(kind) {
+  if (kind === "note") {
+    return `<span class="tree-kind-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M39.5 15.5h-9a2 2 0 0 1-2-2v-9h-18a2 2 0 0 0-2 2v35a2 2 0 0 0 2 2h27a2 2 0 0 0 2-2Z"></path><path d="M28.5 4.5 39.5 15.5"></path></svg></span>`;
+  }
+  if (kind === "asset") {
+    return `<span class="tree-kind-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="m8 15 2.2-2.2a1.2 1.2 0 0 1 1.7 0L15 16"></path><path d="m14 14 1-1a1.2 1.2 0 0 1 1.7 0L20 16.3"></path><path d="M8.5 9.5h.01"></path></svg></span>`;
+  }
+  return `<span class="tree-kind-icon tree-folder-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M28 11v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6c3 0 3 3 5 3h9a2 2 0 0 1 2 2z"></path></svg></span>`;
 }
 
 function renderTreeNode(node, query) {
@@ -1317,7 +1422,7 @@ function renderTreeLeafNode(node, query) {
   button.draggable = true;
   button.dataset.path = node.path;
   button.dataset.type = node.type;
-  button.innerHTML = `<span class="tree-kind-icon" aria-hidden="true">${node.type === "note" ? "◆" : "▧"}</span><span class="tree-label">${escapeHtml(label)}</span>`;
+  button.innerHTML = `${treeIconSvg(node.type)}<span class="tree-label">${escapeHtml(label)}</span>`;
   button.addEventListener("click", () => {
     if (node.type === "note") openNote(node.path);
     else openAsset(node.path);
@@ -1349,7 +1454,7 @@ function renderTreeFolderNode(node, query) {
   const label = document.createElement("button");
   label.className = "tree-label-button";
   label.type = "button";
-  label.innerHTML = `<span class="tree-kind-icon tree-folder-icon" aria-hidden="true">▣</span><span class="tree-label">${escapeHtml(node.name)}</span>`;
+  label.innerHTML = `${treeIconSvg("folder")}<span class="tree-label">${escapeHtml(node.name)}</span>`;
   label.addEventListener("click", () => toggleFolder(node.path));
 
   header.append(toggle, label);
