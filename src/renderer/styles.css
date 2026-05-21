@@ -318,7 +318,7 @@ body.resizing-y textarea {
   color: #fff;
 }
 
-.primary-button:hover {
+.primary-button:hover:not(:disabled) {
   background: var(--accent-dark);
 }
 
@@ -326,6 +326,12 @@ body.resizing-y textarea {
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--ink);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 #suffixIcon {

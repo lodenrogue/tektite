@@ -13,6 +13,13 @@ const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includ
 const appIconPath = path.join(__dirname, "..", "assets", "app", "tektive-icon.webp");
 const fallbackAppIconPath = path.join(__dirname, "..", "assets", "icons", "tektite-icon.png");
 const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif"]);
+const gitExecutableCandidates = [
+  "/usr/bin/git",
+  "/bin/git",
+  "/usr/local/bin/git",
+  "/opt/homebrew/bin/git"
+];
+const gitSafePath = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin";
 const splashMinimumMs = 1200;
 const recentVaultLimit = 10;
 
@@ -392,7 +399,13 @@ ipcMain.handle("git:sync", async (event, rootPath) => {
   }
 
   const outputs = [];
-  const pull = await runGit(rootPath, ["pull", "--ff-only"], send);
+  let pull;
+  try {
+    pull = await runGit(rootPath, ["pull", "--ff-only"], send);
+  } catch (error) {
+    send({ type: "chunk", text: `${error.message}\n` });
+    return fail(error.message);
+  }
   const pullOutput = formatGitCommandOutput("git pull --ff-only", pull);
   outputs.push(pullOutput);
   if (pull.code !== 0) {
@@ -951,17 +964,15 @@ async function gitProviderFor(rootPath) {
   }
 }
 
-function runGit(rootPath, args, send = () => {}, options = {}) {
+async function runGit(rootPath, args, send = () => {}, options = {}) {
+  const gitExecutable = await resolveGitExecutable();
   return new Promise((resolve) => {
     const command = `git ${args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg)).join(" ")}`;
     send({ type: "command", text: `$ ${command}\n` });
 
-    const child = spawn("git", args, {
+    const child = spawn(gitExecutable, args, {
       cwd: rootPath,
-      env: {
-        ...process.env,
-        GIT_TERMINAL_PROMPT: "0"
-      }
+      env: gitEnvironment()
     });
     let stdout = "";
     let stderr = "";
@@ -1008,6 +1019,37 @@ function runGit(rootPath, args, send = () => {}, options = {}) {
       });
     });
   });
+}
+
+async function resolveGitExecutable() {
+  for (const candidate of gitExecutableCandidates) {
+    if (await isSafeExecutable(candidate)) return candidate;
+  }
+  throw new Error("Git executable was not found in a trusted system location.");
+}
+
+async function isSafeExecutable(candidate) {
+  try {
+    const stat = await fs.stat(candidate);
+    if (!stat.isFile()) return false;
+    await fs.access(candidate, fs.constants.X_OK);
+
+    const parent = await fs.stat(path.dirname(candidate));
+    return (parent.mode & 0o002) === 0;
+  } catch {
+    return false;
+  }
+}
+
+function gitEnvironment() {
+  return {
+    HOME: process.env.HOME || "",
+    LANG: process.env.LANG || "en_US.UTF-8",
+    LC_ALL: process.env.LC_ALL || "",
+    SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK || "",
+    GIT_TERMINAL_PROMPT: "0",
+    PATH: gitSafePath
+  };
 }
 
 function formatGitCommandOutput(command, result, emptyOutput = "") {

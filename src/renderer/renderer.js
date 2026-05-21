@@ -356,6 +356,7 @@ async function syncGitVault() {
     clearGitOutputSubscription();
     state.gitSyncInProgress = false;
     updateGitSyncButton();
+    setGitOutputCloseState(false);
   }
 }
 
@@ -1396,8 +1397,15 @@ function showEmptyState(message = "Choose a local folder to start.") {
 
 function showGitOutputDialog(output) {
   els.gitOutputText.textContent = output;
+  setGitOutputCloseState(state.gitSyncInProgress);
   els.gitOutputDialog.setAttribute("open", "");
   els.gitOutputDialog.classList.remove("hidden");
+}
+
+function setGitOutputCloseState(syncing) {
+  els.closeGitOutputButton.disabled = syncing;
+  els.closeGitOutputButton.textContent = syncing ? "Syncing..." : "Close";
+  els.closeGitOutputXButton.disabled = syncing;
 }
 
 function appendGitOutput(text) {
