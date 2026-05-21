@@ -14,6 +14,7 @@ There is no login, cloud sync, telemetry, remote storage, or account system. You
 
 - Open any local folder as a vault.
 - Reopen previously used vaults from `File > Recent Vaults...`.
+- Sync Git-backed vaults with a lightweight `git pull --ff-only`, `git add -A`, `git commit`, and `git push` action.
 - Browse folders, Markdown notes, and image assets in a collapsible file tree.
 - Resize the sidebar, editor, preview, and graph areas.
 - Create new notes and folders from the file tree context menu.

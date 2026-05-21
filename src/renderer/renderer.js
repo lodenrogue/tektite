@@ -12,6 +12,9 @@ const state = {
   selectedPath: "",
   selectedType: "folder",
   showFileExtensions: false,
+  hasGitRepo: false,
+  gitSyncInProgress: false,
+  gitOutputUnsubscribe: null,
   saveTimer: null,
   graph: null,
   collapsedFolders: new Set(),
@@ -60,6 +63,7 @@ const els = {
   vaultName: document.getElementById("vaultName"),
   openVaultButton: document.getElementById("openVaultButton"),
   refreshButton: document.getElementById("refreshButton"),
+  gitSyncButton: document.getElementById("gitSyncButton"),
   themeButton: document.getElementById("themeButton"),
   themeIcon: document.getElementById("themeIcon"),
   suffixButton: document.getElementById("suffixButton"),
@@ -93,7 +97,11 @@ const els = {
   nameInput: document.getElementById("nameInput"),
   confirmNameButton: document.getElementById("confirmNameButton"),
   cancelNameButton: document.getElementById("cancelNameButton"),
-  cancelNameXButton: document.getElementById("cancelNameXButton")
+  cancelNameXButton: document.getElementById("cancelNameXButton"),
+  gitOutputDialog: document.getElementById("gitOutputDialog"),
+  gitOutputText: document.getElementById("gitOutputText"),
+  closeGitOutputButton: document.getElementById("closeGitOutputButton"),
+  closeGitOutputXButton: document.getElementById("closeGitOutputXButton")
 };
 
 boot();
@@ -105,6 +113,7 @@ function boot() {
   updateSuffixButton();
   els.openVaultButton.addEventListener("click", chooseVault);
   els.refreshButton.addEventListener("click", refreshVault);
+  els.gitSyncButton.addEventListener("click", syncGitVault);
   els.themeButton.addEventListener("click", toggleTheme);
   els.suffixButton.addEventListener("click", toggleFileExtensions);
   els.searchInput.addEventListener("input", renderTree);
@@ -134,10 +143,23 @@ function boot() {
   els.nameDialog.addEventListener("click", (event) => {
     if (event.target === els.nameDialog) closeNameDialog(null);
   });
+  els.closeGitOutputButton.addEventListener("click", closeGitOutputDialog);
+  els.closeGitOutputXButton.addEventListener("click", closeGitOutputDialog);
+  els.gitOutputDialog.addEventListener("click", (event) => {
+    if (event.target === els.gitOutputDialog) closeGitOutputDialog();
+  });
   globalThis.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
+      event.preventDefault();
+      refreshVault();
+      return;
+    }
     if (event.key === "Escape") closeTreeContextMenu();
     if (event.key === "Escape" && !els.nameDialog.classList.contains("hidden")) {
       closeNameDialog(null);
+    }
+    if (event.key === "Escape" && !els.gitOutputDialog.classList.contains("hidden")) {
+      closeGitOutputDialog();
     }
   });
   globalThis.addEventListener("click", (event) => {
@@ -153,6 +175,7 @@ function boot() {
   globalThis.tektite.onOpenRecentVault(openVault);
   globalThis.tektite.onNewNote(createNote);
   globalThis.tektite.onCloseTab(closeActiveEditorTab);
+  globalThis.tektite.onRefreshVault(refreshVault);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
   if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") !== "0") {
@@ -290,11 +313,41 @@ function updateSuffixButton() {
   els.suffixButton.setAttribute("aria-label", label);
 }
 
+function updateGitSyncButton() {
+  els.gitSyncButton.disabled = !state.rootPath || !state.hasGitRepo || state.gitSyncInProgress;
+}
+
 async function chooseVault() {
   log("chooseVault start");
   const rootPath = await globalThis.tektite.chooseVault();
   if (!rootPath) return;
   await openVault(rootPath);
+}
+
+async function syncGitVault() {
+  if (!state.rootPath || !state.hasGitRepo || state.gitSyncInProgress) return;
+
+  state.gitSyncInProgress = true;
+  updateGitSyncButton();
+  setSaveState("Syncing...");
+  showGitOutputDialog("Preparing Git sync...\n\n");
+
+  try {
+    await flushActiveNote();
+    clearGitOutputSubscription();
+    state.gitOutputUnsubscribe = globalThis.tektite.onGitSyncOutput(onGitSyncOutput);
+    const result = await globalThis.tektite.syncGit(state.rootPath);
+    await refreshVault({ flush: false });
+    setSaveState(result.ok ? "Synced" : "Git sync failed");
+  } catch (error) {
+    console.error("[tektite:renderer] syncGitVault failed", error);
+    setSaveState("Git sync failed");
+    appendGitOutput(`${error.message || "Git sync failed."}\n`);
+  } finally {
+    clearGitOutputSubscription();
+    state.gitSyncInProgress = false;
+    updateGitSyncButton();
+  }
 }
 
 async function openVault(rootPath) {
@@ -306,6 +359,7 @@ async function openVault(rootPath) {
     state.rootPath = vault.rootPath;
     state.tree = vault.tree;
     state.notes = vault.notes;
+    state.hasGitRepo = Boolean(vault.hasGitRepo);
     state.activePath = null;
     state.activeType = null;
     state.activeContent = "";
@@ -320,6 +374,7 @@ async function openVault(rootPath) {
 
     localStorage.setItem("tektite:lastVault", rootPath);
     els.vaultName.textContent = rootPath.split(/[\\/]/).pop() || rootPath;
+    updateGitSyncButton();
     renderTree();
     updateGraph();
 
@@ -340,17 +395,18 @@ async function openVault(rootPath) {
   }
 }
 
-async function refreshVault() {
+async function refreshVault(options = {}) {
   log("refreshVault start");
   if (!state.rootPath) return chooseVault();
   const activePath = state.activePath;
   const activeType = state.activeType;
   const selectedPath = state.selectedPath;
   const selectedType = state.selectedType;
-  await flushActiveNote();
+  if (options.flush !== false) await flushActiveNote();
   const vault = await globalThis.tektite.scanVault(state.rootPath);
   state.tree = vault.tree;
   state.notes = vault.notes;
+  state.hasGitRepo = Boolean(vault.hasGitRepo);
   indexNotes();
   reconcileOpenTabs();
   await loadGraphContent();
@@ -366,6 +422,7 @@ async function refreshVault() {
   }
   renderTree();
   renderEditorTabs();
+  updateGitSyncButton();
   updateGraph();
   if (activePath && entryExists(activePath, activeType)) await activateTab(activePath, activeType, { preserveCursor: true });
 }
@@ -1254,6 +1311,7 @@ function showEmptyState(message = "Choose a local folder to start.") {
   state.openTabs = [];
   state.previewHistory = [];
   state.previewForwardHistory = [];
+  state.hasGitRepo = false;
   els.editor.value = "";
   els.editor.disabled = true;
   els.editor.classList.remove("hidden");
@@ -1264,9 +1322,37 @@ function showEmptyState(message = "Choose a local folder to start.") {
   els.notePath.textContent = message;
   els.preview.innerHTML = `<p class="empty-copy">${escapeHtml(message)}</p>`;
   renderEditorTabs();
+  updateGitSyncButton();
   updatePreviewNavButtons();
   updateGraph();
   saveWorkspaceState();
+}
+
+function showGitOutputDialog(output) {
+  els.gitOutputText.textContent = output;
+  els.gitOutputDialog.setAttribute("open", "");
+  els.gitOutputDialog.classList.remove("hidden");
+}
+
+function appendGitOutput(text) {
+  els.gitOutputText.textContent += text;
+  els.gitOutputText.scrollTop = els.gitOutputText.scrollHeight;
+}
+
+function onGitSyncOutput(payload) {
+  if (!payload || typeof payload !== "object") return;
+  if (typeof payload.text === "string") appendGitOutput(payload.text);
+}
+
+function clearGitOutputSubscription() {
+  if (!state.gitOutputUnsubscribe) return;
+  state.gitOutputUnsubscribe();
+  state.gitOutputUnsubscribe = null;
+}
+
+function closeGitOutputDialog() {
+  els.gitOutputDialog.classList.add("hidden");
+  els.gitOutputDialog.removeAttribute("open");
 }
 
 async function restoreWorkspaceState() {

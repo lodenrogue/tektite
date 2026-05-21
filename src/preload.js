@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("asset:import-image", rootPath, sourcePath, targetFolder),
   readAssetDataUrl: (rootPath, relativePath) =>
     ipcRenderer.invoke("asset:read-data-url", rootPath, relativePath),
+  syncGit: (rootPath) => ipcRenderer.invoke("git:sync", rootPath),
   loadWorkspaceState: (rootPath) => ipcRenderer.invoke("workspace:load", rootPath),
   saveWorkspaceState: (rootPath, workspace) => ipcRenderer.invoke("workspace:save", rootPath, workspace),
   getFilePath: (file) => webUtils.getPathForFile(file),
@@ -27,5 +28,11 @@ contextBridge.exposeInMainWorld("tektite", {
   onOpenRecentVault: (callback) =>
     ipcRenderer.on("menu:open-recent-vault", (_event, rootPath) => callback(rootPath)),
   onNewNote: (callback) => ipcRenderer.on("menu:new-note", callback),
-  onCloseTab: (callback) => ipcRenderer.on("menu:close-tab", callback)
+  onCloseTab: (callback) => ipcRenderer.on("menu:close-tab", callback),
+  onRefreshVault: (callback) => ipcRenderer.on("menu:refresh-vault", callback),
+  onGitSyncOutput: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("git:sync-output", listener);
+    return () => ipcRenderer.removeListener("git:sync-output", listener);
+  }
 });

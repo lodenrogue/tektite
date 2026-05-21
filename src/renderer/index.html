@@ -28,6 +28,14 @@
                 <path d="M19 4v4h-4"></path>
               </svg>
             </button>
+            <button id="gitSyncButton" class="icon-button" type="button" data-tooltip="Git Sync" aria-label="Git Sync" disabled>
+              <svg class="toolbar-icon" aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M17 3.5a6.5 6.5 0 0 1 1.9 10.9"></path>
+                <path d="M19 8V4h-4"></path>
+                <path d="M7 20.5a6.5 6.5 0 0 1-1.9-10.9"></path>
+                <path d="M5 16v4h4"></path>
+              </svg>
+            </button>
             <button id="suffixButton" class="icon-button" type="button" data-tooltip="Show File Suffixes" aria-label="Show File Suffixes">
               <span id="suffixIcon" aria-hidden="true">.md</span>
             </button>
@@ -116,6 +124,19 @@
         <footer class="modal-actions">
           <button id="cancelNameButton" class="secondary-button" type="button">Cancel</button>
           <button id="confirmNameButton" class="primary-button" type="submit">Create</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="gitOutputDialog" class="modal-backdrop hidden" aria-labelledby="gitOutputTitle">
+      <form method="dialog" class="modal git-output-modal">
+        <header class="modal-header">
+          <h2 id="gitOutputTitle">Git Sync</h2>
+          <button id="closeGitOutputXButton" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+        <pre id="gitOutputText" class="git-output-text"></pre>
+        <footer class="modal-actions">
+          <button id="closeGitOutputButton" class="primary-button" type="button">Close</button>
         </footer>
       </form>
     </dialog>

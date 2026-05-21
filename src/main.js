@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } = require("electron");
+const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
@@ -287,7 +288,11 @@ function buildMenu() {
     {
       label: "View",
       submenu: [
-        { role: "reload" },
+        {
+          label: "Refresh Vault",
+          accelerator: "CmdOrCtrl+R",
+          click: () => sendToActiveWindow("menu:refresh-vault")
+        },
         { role: "toggleDevTools" },
         { type: "separator" },
         { role: "resetZoom" },
@@ -346,9 +351,10 @@ ipcMain.handle("vault:scan", async (_event, rootPath) => {
   assertInsideVault(rootPath, rootPath);
   const tree = await readDirectory(rootPath, rootPath);
   const notes = flattenNotes(tree);
+  const hasGitRepo = await hasGitRepository(rootPath);
   await rememberRecentVault(rootPath);
   log("vault:scan complete", { rootPath, notes: notes.length });
-  return { rootPath, tree, notes };
+  return { rootPath, tree, notes, hasGitRepo };
 });
 
 ipcMain.handle("workspace:load", async (_event, rootPath = "") => {
@@ -368,6 +374,55 @@ ipcMain.handle("workspace:save", async (_event, rootPath, workspace) => {
   store.workspaces[normalizedRoot] = workspace && typeof workspace === "object" ? workspace : {};
   await saveWorkspaceStore(store);
   return true;
+});
+
+ipcMain.handle("git:sync", async (event, rootPath) => {
+  log("git:sync", rootPath);
+  const send = (payload) => event.sender.send("git:sync-output", payload);
+  const fail = (output) => {
+    send({ type: "done", ok: false });
+    return { ok: false, output };
+  };
+
+  assertInsideVault(rootPath, rootPath);
+  if (!(await hasGitRepository(rootPath))) {
+    send({ type: "chunk", text: "This vault does not contain a .git directory.\n" });
+    return fail("This vault does not contain a .git directory.");
+  }
+
+  const outputs = [];
+  const pull = await runGit(rootPath, ["pull", "--ff-only"], send);
+  const pullOutput = formatGitCommandOutput("git pull --ff-only", pull);
+  outputs.push(pullOutput);
+  if (pull.code !== 0) {
+    return fail(pullOutput);
+  }
+
+  const status = await runGit(rootPath, ["status", "--porcelain"], send, { emptyOutput: "Working tree clean." });
+  outputs.push(formatGitCommandOutput("git status --porcelain", status, status.stdout.trim() ? "" : "Working tree clean."));
+  if (status.code !== 0) {
+    return fail(outputs.join("\n\n"));
+  }
+
+  if (status.stdout.trim()) {
+    const add = await runGit(rootPath, ["add", "-A"], send);
+    outputs.push(formatGitCommandOutput("git add -A", add));
+    if (add.code !== 0) {
+      return fail(outputs.join("\n\n"));
+    }
+
+    const commit = await runGit(rootPath, ["commit", "-m", "Update Tektite vault"], send);
+    outputs.push(formatGitCommandOutput("git commit -m \"Update Tektite vault\"", commit));
+    if (commit.code !== 0) {
+      return fail(outputs.join("\n\n"));
+    }
+  }
+
+  const push = await runGit(rootPath, ["push"], send);
+  const pushOutput = formatGitCommandOutput("git push", push);
+  outputs.push(pushOutput);
+  send({ type: "done", ok: push.code === 0 });
+  return { ok: push.code === 0, output: outputs.join("\n\n") };
 });
 
 ipcMain.handle("note:read", async (_event, rootPath, relativePath) => {
@@ -872,4 +927,83 @@ async function exists(filePath) {
   } catch {
     return false;
   }
+}
+
+async function hasGitRepository(rootPath) {
+  try {
+    assertInsideVault(rootPath, path.join(rootPath, ".git"));
+    await fs.access(path.join(rootPath, ".git"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runGit(rootPath, args, send = () => {}, options = {}) {
+  return new Promise((resolve) => {
+    const command = `git ${args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg)).join(" ")}`;
+    send({ type: "command", text: `$ ${command}\n` });
+
+    const child = spawn("git", args, {
+      cwd: rootPath,
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: "0"
+      }
+    });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, 120000);
+
+    child.stdout.on("data", (data) => {
+      const text = data.toString();
+      stdout += text;
+      send({ type: "chunk", text });
+    });
+    child.stderr.on("data", (data) => {
+      const text = data.toString();
+      stderr += text;
+      send({ type: "chunk", text });
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      const message = `${error.message}\n`;
+      send({ type: "chunk", text: message });
+      resolve({
+        code: 1,
+        signal: null,
+        stdout,
+        stderr,
+        error: error.message
+      });
+    });
+    child.on("close", (code, signal) => {
+      clearTimeout(timeout);
+      const exitCode = timedOut ? 1 : code || 0;
+      const status = exitCode === 0 ? "OK" : `FAILED (${timedOut ? "timeout" : signal || exitCode})`;
+      if (!stdout.trim() && options.emptyOutput) send({ type: "chunk", text: `${options.emptyOutput}\n` });
+      send({ type: "status", text: `${status}\n\n` });
+      resolve({
+        code: exitCode,
+        signal: timedOut ? "timeout" : signal,
+        stdout,
+        stderr,
+        error: timedOut ? "Command timed out." : ""
+      });
+    });
+  });
+}
+
+function formatGitCommandOutput(command, result, emptyOutput = "") {
+  const status = result.code === 0 ? "OK" : `FAILED (${result.signal || result.code})`;
+  const parts = [`$ ${command}`, status];
+  if (result.stdout.trim()) parts.push("", result.stdout.trim());
+  else if (emptyOutput) parts.push("", emptyOutput);
+  if (result.stderr.trim()) parts.push("", result.stderr.trim());
+  if (result.error && result.code !== 0 && !result.stderr.trim()) parts.push("", result.error);
+  return parts.join("\n");
 }

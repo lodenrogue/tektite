@@ -920,6 +920,25 @@ button.tree-row {
   padding: 16px;
 }
 
+.git-output-modal {
+  width: min(720px, 100%);
+}
+
+.git-output-text {
+  max-height: min(420px, 55vh);
+  margin: 0 0 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--code-block-bg);
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
