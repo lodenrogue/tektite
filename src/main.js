@@ -7,6 +7,7 @@ let aboutWindow;
 let splashWindow;
 let splashShownAt = 0;
 let recentVaults = [];
+const tektiteWindows = new Set();
 const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includes("tektite");
 const appIconPath = path.join(__dirname, "..", "assets", "app", "tektive-icon.webp");
 const fallbackAppIconPath = path.join(__dirname, "..", "assets", "icons", "tektite-icon.png");
@@ -24,7 +25,7 @@ function log(...args) {
 function createWindow(options = {}) {
   const shouldShowImmediately = options.show !== false;
   const appIcon = loadAppIcon();
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 1440,
     height: 920,
     minWidth: 980,
@@ -40,27 +41,41 @@ function createWindow(options = {}) {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
-  mainWindow.once("ready-to-show", () => {
+  mainWindow = window;
+  tektiteWindows.add(window);
+
+  window.loadFile(path.join(__dirname, "renderer", "index.html"), {
+    query: {
+      restoreLastVault: options.restoreLastVault === false ? "0" : "1"
+    }
+  });
+  window.once("ready-to-show", () => {
     if (splashWindow && !splashWindow.isDestroyed()) {
       const elapsed = Date.now() - splashShownAt;
       setTimeout(() => {
         if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
         splashWindow = null;
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+        if (!window.isDestroyed()) window.show();
       }, Math.max(0, splashMinimumMs - elapsed));
-    } else if (!shouldShowImmediately && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show();
+    } else if (!shouldShowImmediately && !window.isDestroyed()) {
+      window.show();
     }
   });
 
-  mainWindow.on("closed", () => {
-    mainWindow = null;
+  window.on("focus", () => {
+    mainWindow = window;
+  });
+
+  window.on("closed", () => {
+    tektiteWindows.delete(window);
+    if (mainWindow === window) mainWindow = [...tektiteWindows][0] || null;
   });
 
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(appIcon);
   }
+
+  return window;
 }
 
 function createSplashWindow() {
@@ -106,7 +121,7 @@ function showAboutWindow() {
     minimizable: false,
     maximizable: false,
     title: "About Tektite",
-    parent: mainWindow || undefined,
+    parent: activeTektiteWindow() || undefined,
     modal: false,
     icon: loadAppIcon(),
     backgroundColor: "#111318",
@@ -123,6 +138,16 @@ function showAboutWindow() {
   aboutWindow.on("closed", () => {
     aboutWindow = null;
   });
+}
+
+function activeTektiteWindow() {
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+  if (focusedWindow && tektiteWindows.has(focusedWindow)) return focusedWindow;
+  return mainWindow || [...tektiteWindows][0] || null;
+}
+
+function sendToActiveWindow(channel, ...args) {
+  activeTektiteWindow()?.webContents.send(channel, ...args);
 }
 
 function loadAppIcon() {
@@ -187,7 +212,7 @@ function buildMenu() {
     ? recentVaults.map((vaultPath) => ({
         label: path.basename(vaultPath) || vaultPath,
         sublabel: vaultPath,
-        click: () => mainWindow?.webContents.send("menu:open-recent-vault", vaultPath)
+        click: () => sendToActiveWindow("menu:open-recent-vault", vaultPath)
       }))
     : [{ label: "No Recent Vaults", enabled: false }];
   const template = [
@@ -213,21 +238,38 @@ function buildMenu() {
       label: "File",
       submenu: [
         {
+          label: "New Window",
+          accelerator: "CmdOrCtrl+N",
+          click: () => createWindow({ restoreLastVault: false })
+        },
+        { type: "separator" },
+        {
           label: "Open Vault...",
           accelerator: "CmdOrCtrl+O",
-          click: () => mainWindow?.webContents.send("menu:open-vault")
+          click: () => sendToActiveWindow("menu:open-vault")
         },
         {
           label: "Recent Vaults...",
           submenu: recentVaultItems
         },
+        { type: "separator" },
         {
           label: "New Node",
-          accelerator: "CmdOrCtrl+N",
-          click: () => mainWindow?.webContents.send("menu:new-note")
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => sendToActiveWindow("menu:new-note")
         },
         { type: "separator" },
-        isMac ? { role: "close" } : { role: "quit" }
+        {
+          label: "Close Tab",
+          accelerator: "CmdOrCtrl+W",
+          click: () => sendToActiveWindow("menu:close-tab")
+        },
+        {
+          label: "Close Window",
+          accelerator: "Shift+CmdOrCtrl+W",
+          click: () => activeTektiteWindow()?.close()
+        },
+        ...(isMac ? [] : [{ type: "separator" }, { role: "quit" }])
       ]
     },
     {
@@ -276,7 +318,7 @@ app.on("ready", async () => {
   createWindow({ show: false });
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (tektiteWindows.size === 0) createWindow();
   });
 });
 
@@ -286,7 +328,7 @@ app.on("window-all-closed", () => {
 
 ipcMain.handle("vault:choose", async () => {
   log("vault:choose start");
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await dialog.showOpenDialog(activeTektiteWindow() || undefined, {
     title: "Open Tektite Vault",
     properties: ["openDirectory"]
   });

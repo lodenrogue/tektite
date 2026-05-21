@@ -152,9 +152,14 @@ function boot() {
   globalThis.tektite.onOpenVault(chooseVault);
   globalThis.tektite.onOpenRecentVault(openVault);
   globalThis.tektite.onNewNote(createNote);
+  globalThis.tektite.onCloseTab(closeActiveEditorTab);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
-  restoreLastVault().catch(() => showEmptyState());
+  if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") !== "0") {
+    restoreLastVault().catch(() => showEmptyState());
+  } else {
+    showEmptyState();
+  }
 }
 
 async function restoreLastVault() {
@@ -1097,6 +1102,11 @@ async function closeEditorTab(path, type) {
     showEmptyState("Select or create a note.");
   }
   saveWorkspaceState();
+}
+
+function closeActiveEditorTab() {
+  if (!state.activePath || !state.activeType) return;
+  closeEditorTab(state.activePath, state.activeType);
 }
 
 async function flushActiveNote() {
