@@ -1065,7 +1065,7 @@ function renderEditorTabs() {
     button.setAttribute("aria-selected", tab.path === state.activePath && tab.type === state.activeType ? "true" : "false");
     button.title = tab.path;
     button.innerHTML = `
-      <span aria-hidden="true">${tab.type === "note" ? "◆" : "▧"}</span>
+      ${treeIconSvg(tab.type)}
       <span class="editor-tab-label">${escapeHtml(tab.title)}</span>
       <span class="editor-tab-close" role="button" aria-label="Close tab" tabindex="-1">×</span>
     `;

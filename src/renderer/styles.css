@@ -557,6 +557,18 @@ button.tree-row {
   color: var(--ink);
 }
 
+.editor-tab .tree-kind-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+
+.editor-tab .tree-kind-icon svg,
+.editor-tab .tree-kind-icon:not(.tree-folder-icon) svg {
+  width: 16px;
+  height: 16px;
+}
+
 .editor-tab-label {
   overflow: hidden;
   text-overflow: ellipsis;
