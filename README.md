@@ -35,7 +35,6 @@ There is no login, cloud sync, telemetry, remote storage, or account system. You
 - Pan the graph by dragging empty space.
 - Drag individual graph nodes to reposition them.
 - Toggle dark and light mode. Dark mode is the default.
-- Custom Tektite app icon, splash screen, and About dialog.
 
 ## Screenshots
 
