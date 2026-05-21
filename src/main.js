@@ -352,9 +352,10 @@ ipcMain.handle("vault:scan", async (_event, rootPath) => {
   const tree = await readDirectory(rootPath, rootPath);
   const notes = flattenNotes(tree);
   const hasGitRepo = await hasGitRepository(rootPath);
+  const gitProvider = hasGitRepo ? await gitProviderFor(rootPath) : null;
   await rememberRecentVault(rootPath);
   log("vault:scan complete", { rootPath, notes: notes.length });
-  return { rootPath, tree, notes, hasGitRepo };
+  return { rootPath, tree, notes, hasGitRepo, gitProvider };
 });
 
 ipcMain.handle("workspace:load", async (_event, rootPath = "") => {
@@ -936,6 +937,17 @@ async function hasGitRepository(rootPath) {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function gitProviderFor(rootPath) {
+  try {
+    const configPath = path.join(rootPath, ".git", "config");
+    assertInsideVault(rootPath, configPath);
+    const config = await fs.readFile(configPath, "utf8");
+    return /\bgithub\.com[:/]/i.test(config) || /\bgithub\.com\b/i.test(config) ? "github" : "git";
+  } catch {
+    return "git";
   }
 }
 

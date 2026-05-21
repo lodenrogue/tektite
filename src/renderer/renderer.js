@@ -13,6 +13,7 @@ const state = {
   selectedType: "folder",
   showFileExtensions: false,
   hasGitRepo: false,
+  gitProvider: null,
   gitSyncInProgress: false,
   gitOutputUnsubscribe: null,
   saveTimer: null,
@@ -64,6 +65,7 @@ const els = {
   openVaultButton: document.getElementById("openVaultButton"),
   refreshButton: document.getElementById("refreshButton"),
   gitSyncButton: document.getElementById("gitSyncButton"),
+  githubSyncButton: document.getElementById("githubSyncButton"),
   themeButton: document.getElementById("themeButton"),
   themeIcon: document.getElementById("themeIcon"),
   suffixButton: document.getElementById("suffixButton"),
@@ -114,6 +116,7 @@ function boot() {
   els.openVaultButton.addEventListener("click", chooseVault);
   els.refreshButton.addEventListener("click", refreshVault);
   els.gitSyncButton.addEventListener("click", syncGitVault);
+  els.githubSyncButton.addEventListener("click", syncGitVault);
   els.themeButton.addEventListener("click", toggleTheme);
   els.suffixButton.addEventListener("click", toggleFileExtensions);
   els.searchInput.addEventListener("input", renderTree);
@@ -314,7 +317,13 @@ function updateSuffixButton() {
 }
 
 function updateGitSyncButton() {
-  els.gitSyncButton.disabled = !state.rootPath || !state.hasGitRepo || state.gitSyncInProgress;
+  const disabled = !state.rootPath || !state.hasGitRepo || state.gitSyncInProgress;
+  const showGithub = state.hasGitRepo && state.gitProvider === "github";
+  const showGenericGit = state.hasGitRepo && !showGithub;
+  els.gitSyncButton.classList.toggle("hidden", !showGenericGit);
+  els.githubSyncButton.classList.toggle("hidden", !showGithub);
+  els.gitSyncButton.disabled = disabled || !showGenericGit;
+  els.githubSyncButton.disabled = disabled || !showGithub;
 }
 
 async function chooseVault() {
@@ -360,6 +369,7 @@ async function openVault(rootPath) {
     state.tree = vault.tree;
     state.notes = vault.notes;
     state.hasGitRepo = Boolean(vault.hasGitRepo);
+    state.gitProvider = vault.gitProvider || null;
     state.activePath = null;
     state.activeType = null;
     state.activeContent = "";
@@ -407,6 +417,7 @@ async function refreshVault(options = {}) {
   state.tree = vault.tree;
   state.notes = vault.notes;
   state.hasGitRepo = Boolean(vault.hasGitRepo);
+  state.gitProvider = vault.gitProvider || null;
   indexNotes();
   reconcileOpenTabs();
   await loadGraphContent();
@@ -1312,6 +1323,7 @@ function showEmptyState(message = "Choose a local folder to start.") {
   state.previewHistory = [];
   state.previewForwardHistory = [];
   state.hasGitRepo = false;
+  state.gitProvider = null;
   els.editor.value = "";
   els.editor.disabled = true;
   els.editor.classList.remove("hidden");

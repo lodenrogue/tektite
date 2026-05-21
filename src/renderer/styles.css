@@ -257,6 +257,11 @@ body.resizing-y textarea {
   stroke-width: 2;
 }
 
+.toolbar-icon-github {
+  width: 20px;
+  height: 20px;
+}
+
 .theme-icon {
   display: grid;
   place-items: center;
