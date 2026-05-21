@@ -76,6 +76,8 @@ brew install --cask tektite
 
 The cask installs the macOS release asset from GitHub Releases.
 
+Homebrew installs the matching build for Apple Silicon or Intel Macs.
+
 The Homebrew cask removes the macOS quarantine attribute during install. If you download the release zip manually and macOS says the app is damaged, run:
 
 ```sh
