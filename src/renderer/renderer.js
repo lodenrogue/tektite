@@ -620,16 +620,11 @@ function updateMentionMenu() {
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
     .slice(0, 12);
 
-  if (!items.length) {
-    closeMentionMenu();
-    return;
-  }
-
   state.mention = {
     active: true,
     start,
     query,
-    selectedIndex: state.mention.query === query ? Math.min(state.mention.selectedIndex, items.length - 1) : 0,
+    selectedIndex: state.mention.query === query ? Math.min(state.mention.selectedIndex, items.length) : 0,
     items
   };
   renderMentionMenu();
@@ -639,12 +634,25 @@ function updateMentionMenu() {
 function renderMentionMenu() {
   if (!state.mention.active) return;
   els.mentionMenu.innerHTML = "";
+  const newNodeOption = document.createElement("button");
+  newNodeOption.type = "button";
+  newNodeOption.className = `mention-option mention-action${state.mention.selectedIndex === 0 ? " active" : ""}`;
+  newNodeOption.setAttribute("role", "option");
+  newNodeOption.setAttribute("aria-selected", String(state.mention.selectedIndex === 0));
+  newNodeOption.innerHTML = `<span>New Node</span><small>${escapeHtml(mentionDefaultName())}</small>`;
+  newNodeOption.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    createMentionNode();
+  });
+  els.mentionMenu.appendChild(newNodeOption);
+
   state.mention.items.forEach((note, index) => {
+    const optionIndex = index + 1;
     const option = document.createElement("button");
     option.type = "button";
-    option.className = `mention-option${index === state.mention.selectedIndex ? " active" : ""}`;
+    option.className = `mention-option${optionIndex === state.mention.selectedIndex ? " active" : ""}`;
     option.setAttribute("role", "option");
-    option.setAttribute("aria-selected", String(index === state.mention.selectedIndex));
+    option.setAttribute("aria-selected", String(optionIndex === state.mention.selectedIndex));
     option.innerHTML = `<span>${escapeHtml(note.name)}</span><small>${escapeHtml(note.path)}</small>`;
     option.addEventListener("mousedown", (event) => {
       event.preventDefault();
@@ -684,6 +692,51 @@ function insertMentionLink(note) {
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveActiveNote, 150);
   els.editor.focus();
+}
+
+async function createMentionNode() {
+  if (!state.rootPath || state.activeType !== "note" || !state.activePath || !state.mention.active) return;
+
+  const sourcePath = state.activePath;
+  const rangeStart = state.mention.start;
+  const rangeEnd = els.editor.selectionStart;
+  const defaultName = mentionDefaultName();
+  closeMentionMenu();
+  const requestedName = await openNameDialog({
+    title: "New node",
+    defaultName
+  });
+  if (requestedName === null) {
+    els.editor.focus();
+    return;
+  }
+
+  try {
+    const newPath = await globalThis.tektite.createNote(state.rootPath, requestedName, parentFolder(sourcePath));
+    await refreshVault();
+    if (state.activePath !== sourcePath && entryExists(sourcePath, "note")) {
+      await openNote(sourcePath);
+    }
+
+    const note = state.noteByPath.get(newPath);
+    if (!note) throw new Error("Created note was not found after refresh.");
+    const link = `[${note.name}](${relativeMarkdownLink(sourcePath, newPath)})`;
+    els.editor.setRangeText(link, rangeStart, rangeEnd, "end");
+    state.activeContent = els.editor.value;
+    renderPreview(state.activeContent);
+    recordEditorHistory();
+    setSaveState("Unsaved");
+    clearTimeout(state.saveTimer);
+    await saveActiveNote();
+    await openNote(newPath);
+  } catch (error) {
+    console.error("[tektite:renderer] createMentionNode failed", error);
+    setSaveState("Failed");
+  }
+}
+
+function mentionDefaultName() {
+  return state.mention.query.trim() || "Untitled";
 }
 
 function onEditorDragOver(event) {
@@ -1283,7 +1336,7 @@ function onEditorKeydown(event) {
 
   if (event.key === "ArrowDown") {
     event.preventDefault();
-    state.mention.selectedIndex = Math.min(state.mention.selectedIndex + 1, state.mention.items.length - 1);
+    state.mention.selectedIndex = Math.min(state.mention.selectedIndex + 1, state.mention.items.length);
     renderMentionMenu();
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
@@ -1291,7 +1344,8 @@ function onEditorKeydown(event) {
     renderMentionMenu();
   } else if (event.key === "Enter" || event.key === "Tab") {
     event.preventDefault();
-    insertMentionLink(state.mention.items[state.mention.selectedIndex]);
+    if (state.mention.selectedIndex === 0) createMentionNode();
+    else insertMentionLink(state.mention.items[state.mention.selectedIndex - 1]);
   } else if (event.key === "Escape") {
     event.preventDefault();
     closeMentionMenu();

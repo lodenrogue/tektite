@@ -647,6 +647,12 @@ button.tree-row {
   color: var(--tree-active-ink);
 }
 
+.mention-action {
+  border-bottom: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+  margin-bottom: 4px;
+}
+
 .mention-option span,
 .mention-option small {
   overflow: hidden;
