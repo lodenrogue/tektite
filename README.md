@@ -6,9 +6,9 @@
 
 ![Tektite](assets/app/tektite-splash.png)
 
-Tektite is a local-first Markdown knowledge base app for macOS and Linux. It opens a local folder as a vault, lets you write Markdown notes, shows a live preview, and draws a graph of how notes are connected.
+Tektite is a deliberately lightweight Markdown knowledge base app for macOS and Linux. It keeps the core workflow simple: open a local folder, write Markdown notes, preview them live, and see how they connect in the graph.
 
-There is no login, cloud sync service, telemetry, remote storage, or account system. Your vault is just a folder on disk, and if you want sync, plain Git works nicely.
+There is no login, cloud sync service, telemetry, remote storage, account system, or plugin system. Your vault is just a folder on disk, and if you want sync, plain Git works nicely.
 
 ## Features
 
