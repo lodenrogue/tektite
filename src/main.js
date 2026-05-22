@@ -20,7 +20,7 @@ const gitExecutableCandidates = [
   "/opt/homebrew/bin/git"
 ];
 const gitSafePath = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin";
-const splashMinimumMs = 1200;
+const splashMinimumMs = 5000;
 const recentVaultLimit = 10;
 
 app.name = "Tektite";
@@ -110,7 +110,9 @@ function createSplashWindow() {
     }
   });
 
-  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  splashWindow.loadFile(path.join(__dirname, "splash.html"), {
+    query: { version: app.getVersion() }
+  });
   splashWindow.once("ready-to-show", () => {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.show();
   });

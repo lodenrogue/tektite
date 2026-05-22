@@ -32,6 +32,8 @@
       .logo-panel {
         display: grid;
         place-items: center;
+        align-content: center;
+        gap: 14px;
         padding: 12px 28px;
         background: #ffffff;
       }
@@ -42,6 +44,14 @@
         display: block;
         margin: 0 auto;
         border-radius: 8px;
+      }
+
+      .tagline {
+        margin: 0;
+        color: #111111;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.35;
       }
 
       .details-panel {
@@ -73,6 +83,7 @@
     <main>
       <section class="logo-panel" aria-label="Tektite logo">
         <img src="../assets/app/tektite-splash.png" alt="Tektite">
+        <p class="tagline">A lightweight Markdown knowledge base<br>for local folders.</p>
       </section>
       <section class="details-panel">
         <h1>Tektite</h1>
