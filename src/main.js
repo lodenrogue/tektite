@@ -51,6 +51,7 @@ function createWindow(options = {}) {
 
   mainWindow = window;
   tektiteWindows.add(window);
+  buildMenu();
 
   window.loadFile(path.join(__dirname, "renderer", "index.html"), {
     query: {
@@ -72,11 +73,13 @@ function createWindow(options = {}) {
 
   window.on("focus", () => {
     mainWindow = window;
+    buildMenu();
   });
 
   window.on("closed", () => {
     tektiteWindows.delete(window);
     if (mainWindow === window) mainWindow = [...tektiteWindows][0] || null;
+    buildMenu();
   });
 
   if (process.platform === "darwin" && app.dock) {
@@ -309,6 +312,10 @@ function buildMenu() {
         { role: "togglefullscreen" }
       ]
     },
+    {
+      label: "Window",
+      submenu: windowMenuItems(isMac)
+    },
     ...(isMac
       ? []
       : [
@@ -320,6 +327,48 @@ function buildMenu() {
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function windowMenuItems(isMac) {
+  const windows = [...tektiteWindows].filter((window) => !window.isDestroyed());
+  const focusedWindow = activeTektiteWindow();
+  const windowItems = windows.map((window) => ({
+    type: "checkbox",
+    label: windowMenuLabel(window),
+    checked: window === focusedWindow,
+    click: () => focusTektiteWindow(window)
+  }));
+
+  return [
+    { role: "minimize" },
+    isMac
+      ? { role: "zoom" }
+      : {
+          label: "Maximize",
+          click: () => toggleMaximize(activeTektiteWindow())
+        },
+    ...(isMac ? [{ type: "separator" }, { role: "front" }] : []),
+    { type: "separator" },
+    ...(windowItems.length > 0 ? windowItems : [{ label: "No Windows", enabled: false }])
+  ];
+}
+
+function windowMenuLabel(window) {
+  const vaultName = window.vaultName || window.getTitle() || "Tektite";
+  return vaultName;
+}
+
+function focusTektiteWindow(window) {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
+function toggleMaximize(window) {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMaximized()) window.unmaximize();
+  else window.maximize();
 }
 
 app.on("ready", async () => {
@@ -381,6 +430,17 @@ ipcMain.handle("workspace:save", async (_event, rootPath, workspace) => {
   store.lastVault = normalizedRoot;
   store.workspaces[normalizedRoot] = workspace && typeof workspace === "object" ? workspace : {};
   await saveWorkspaceStore(store);
+  return true;
+});
+
+ipcMain.handle("window:set-vault-name", (event, vaultName) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window || !tektiteWindows.has(window)) return false;
+
+  const label = typeof vaultName === "string" && vaultName.trim() ? vaultName.trim() : "";
+  window.vaultName = label;
+  window.setTitle(label ? `Tektite - ${label}` : "Tektite");
+  buildMenu();
   return true;
 });
 

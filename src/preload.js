@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("asset:import-image", rootPath, sourcePath, targetFolder),
   readAssetDataUrl: (rootPath, relativePath) =>
     ipcRenderer.invoke("asset:read-data-url", rootPath, relativePath),
+  setVaultWindowTitle: (vaultName) => ipcRenderer.invoke("window:set-vault-name", vaultName),
   syncGit: (rootPath) => ipcRenderer.invoke("git:sync", rootPath),
   loadWorkspaceState: (rootPath) => ipcRenderer.invoke("workspace:load", rootPath),
   saveWorkspaceState: (rootPath, workspace) => ipcRenderer.invoke("workspace:save", rootPath, workspace),

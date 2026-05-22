@@ -384,7 +384,9 @@ async function openVault(rootPath) {
     await loadGraphContent();
 
     localStorage.setItem("tektite:lastVault", rootPath);
-    els.vaultName.textContent = rootPath.split(/[\\/]/).pop() || rootPath;
+    const vaultName = rootPath.split(/[\\/]/).pop() || rootPath;
+    els.vaultName.textContent = vaultName;
+    await globalThis.tektite.setVaultWindowTitle(vaultName);
     updateGitSyncButton();
     renderTree();
     updateGraph();
