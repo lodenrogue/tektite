@@ -4,7 +4,7 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mathiasconradt_tektite&metric=alert_status&token=27834731d82afc73030bc1e8559b67ac51f516d1)](https://sonarcloud.io/summary/new_code?id=mathiasconradt_tektite)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-![Tektite](assets/app/tektite-splash.png)
+![Tektite](docs/images/promo.png)
 
 Tektite is a deliberately lightweight Markdown knowledge base app for macOS and Linux. It keeps the core workflow simple: open a local folder, write Markdown notes, preview them live, and see how they connect in the graph.
 
