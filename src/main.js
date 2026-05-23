@@ -163,6 +163,25 @@ function sendToActiveWindow(channel, ...args) {
   activeTektiteWindow()?.webContents.send(channel, ...args);
 }
 
+function sendToWindowOrCreate(channel, ...args) {
+  const window = activeTektiteWindow();
+  if (window && !window.isDestroyed()) {
+    window.webContents.send(channel, ...args);
+    return;
+  }
+
+  const newWindow = createWindow({ restoreLastVault: false });
+  newWindow.webContents.once("did-finish-load", () => {
+    if (!newWindow.isDestroyed()) newWindow.webContents.send(channel, ...args);
+  });
+}
+
+async function openRecentVaultFromMenu(vaultPath) {
+  const validation = await validateVaultRoot(vaultPath);
+  if (!validation.ok) return;
+  sendToWindowOrCreate("menu:open-recent-vault", vaultPath);
+}
+
 function loadAppIcon() {
   const icon = nativeImage.createFromPath(appIconPath);
   if (!icon.isEmpty()) return icon;
@@ -197,6 +216,45 @@ function recentVaultsPath() {
   return path.join(app.getPath("userData"), "recent-vaults.json");
 }
 
+async function validateVaultRoot(rootPath, sender) {
+  let stat;
+  try {
+    stat = await fs.stat(rootPath);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return showVaultUnavailableDialog(sender, rootPath);
+    }
+    throw error;
+  }
+
+  if (!stat.isDirectory()) {
+    return showVaultUnavailableDialog(sender, rootPath);
+  }
+
+  return { ok: true };
+}
+
+async function showVaultUnavailableDialog(sender, rootPath) {
+  const owner = sender ? BrowserWindow.fromWebContents(sender) : activeTektiteWindow();
+  const message = "The vault folder doesn't exist anymore.";
+  await dialog.showMessageBox(owner || undefined, {
+    type: "warning",
+    title: "Vault Folder Not Found",
+    message,
+    detail: `Tektite tried to open:\n${rootPath}`,
+    buttons: ["OK"],
+    defaultId: 0,
+    noLink: true
+  });
+
+  return {
+    ok: false,
+    code: "VAULT_NOT_FOUND",
+    message,
+    path: rootPath
+  };
+}
+
 function workspaceStatePath() {
   return path.join(app.getPath("userData"), "workspace-state.json");
 }
@@ -225,7 +283,7 @@ function buildMenu() {
     ? recentVaults.map((vaultPath) => ({
         label: path.basename(vaultPath) || vaultPath,
         sublabel: vaultPath,
-        click: () => sendToActiveWindow("menu:open-recent-vault", vaultPath)
+        click: () => openRecentVaultFromMenu(vaultPath)
       }))
     : [{ label: "No Recent Vaults", enabled: false }];
   const template = [
@@ -259,7 +317,7 @@ function buildMenu() {
         {
           label: "Open Vault...",
           accelerator: "CmdOrCtrl+O",
-          click: () => sendToActiveWindow("menu:open-vault")
+          click: () => sendToWindowOrCreate("menu:open-vault")
         },
         {
           label: "Recent Vaults...",
@@ -407,13 +465,16 @@ ipcMain.handle("vault:choose", async () => {
 ipcMain.handle("vault:scan", async (_event, rootPath) => {
   log("vault:scan start", rootPath);
   assertInsideVault(rootPath, rootPath);
+  const validation = await validateVaultRoot(rootPath, _event.sender);
+  if (!validation.ok) return validation;
+
   const tree = await readDirectory(rootPath, rootPath);
   const notes = flattenNotes(tree);
   const hasGitRepo = await hasGitRepository(rootPath);
   const gitProvider = hasGitRepo ? await gitProviderFor(rootPath) : null;
   await rememberRecentVault(rootPath);
   log("vault:scan complete", { rootPath, notes: notes.length });
-  return { rootPath, tree, notes, hasGitRepo, gitProvider };
+  return { ok: true, rootPath, tree, notes, hasGitRepo, gitProvider };
 });
 
 ipcMain.handle("workspace:load", async (_event, rootPath = "") => {

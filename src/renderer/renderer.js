@@ -365,6 +365,10 @@ async function openVault(rootPath) {
   setSaveState("Opening...");
   try {
     const vault = await globalThis.tektite.scanVault(rootPath);
+    if (!vault.ok) {
+      handleUnavailableVault(vault);
+      return;
+    }
     log("openVault scan complete", { notes: vault.notes.length });
     state.rootPath = vault.rootPath;
     state.tree = vault.tree;
@@ -417,6 +421,10 @@ async function refreshVault(options = {}) {
   const selectedType = state.selectedType;
   if (options.flush !== false) await flushActiveNote();
   const vault = await globalThis.tektite.scanVault(state.rootPath);
+  if (!vault.ok) {
+    handleUnavailableVault(vault);
+    return;
+  }
   state.tree = vault.tree;
   state.notes = vault.notes;
   state.hasGitRepo = Boolean(vault.hasGitRepo);
@@ -1363,6 +1371,10 @@ async function saveActiveNote() {
   state.noteContent.set(state.activePath, state.activeContent);
   setSaveState("Saved");
   const vault = await globalThis.tektite.scanVault(state.rootPath);
+  if (!vault.ok) {
+    handleUnavailableVault(vault);
+    return;
+  }
   state.tree = vault.tree;
   state.notes = vault.notes;
   indexNotes();
@@ -1395,6 +1407,16 @@ function showEmptyState(message = "Choose a local folder to start.") {
   updatePreviewNavButtons();
   updateGraph();
   saveWorkspaceState();
+}
+
+function handleUnavailableVault(result) {
+  if (result?.code === "VAULT_NOT_FOUND") {
+    setSaveState("Idle");
+    return;
+  }
+
+  showEmptyState(result?.message || "Could not open vault.");
+  setSaveState("Failed");
 }
 
 function showGitOutputDialog(output) {
