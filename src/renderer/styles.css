@@ -468,9 +468,9 @@ button.tree-row {
 }
 
 .tree-children {
-  margin-left: 13px;
+  margin-left: 18px;
   border-left: 1px solid var(--tree-guide);
-  padding-left: 6px;
+  padding-left: 14px;
 }
 
 .workspace {
