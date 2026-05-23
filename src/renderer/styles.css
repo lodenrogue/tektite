@@ -101,14 +101,10 @@ button {
   min-width: 0;
   min-height: 0;
   height: 100vh;
-  grid-template-rows: auto auto minmax(120px, 1fr) 6px minmax(70px, 118px) 6px minmax(160px, 34vh);
+  grid-template-rows: auto auto minmax(56px, 1fr) 6px minmax(56px, 118px) 6px minmax(100px, 240px);
   overflow: hidden;
   border-right: 1px solid var(--line);
   background: var(--sidebar);
-}
-
-.sidebar.graph-hidden {
-  grid-template-rows: auto auto minmax(120px, 1fr) 6px minmax(70px, 118px) 0 0;
 }
 
 .resizer {

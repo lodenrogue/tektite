@@ -27,7 +27,7 @@ const state = {
     sidebarWidth: 300,
     editorRatio: 0.52,
     sidebarTagsHeight: 118,
-    sidebarGraphRatio: 0.34
+    sidebarGraphHeight: 240
   },
   activeResize: null,
   graphViewport: {
@@ -56,6 +56,9 @@ const state = {
 };
 
 const WORKSPACE_STORAGE_PREFIX = "tektite:workspace:";
+const FILE_TREE_MIN_HEIGHT = 56;
+const TAGS_MIN_HEIGHT = 56;
+const GRAPH_MIN_HEIGHT = 100;
 
 const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
   localStorage.getItem("tektite:verbose") === "1";
@@ -224,13 +227,17 @@ function loadLayout() {
     const saved = JSON.parse(localStorage.getItem("tektite:layout") || "{}");
     state.layout.sidebarWidth = clamp(Number(saved.sidebarWidth) || 300, 220, 520);
     state.layout.editorRatio = clamp(Number(saved.editorRatio) || 0.52, 0.28, 0.78);
-    state.layout.sidebarTagsHeight = clamp(Number(saved.sidebarTagsHeight) || 118, 70, 220);
-    state.layout.sidebarGraphRatio = clamp(Number(saved.sidebarGraphRatio) || 0.34, 0.2, 0.7);
+    state.layout.sidebarTagsHeight = clamp(Number(saved.sidebarTagsHeight) || 118, TAGS_MIN_HEIGHT, globalThis.innerHeight);
+    state.layout.sidebarGraphHeight = clamp(
+      Number(saved.sidebarGraphHeight) || Math.round((Number(saved.sidebarGraphRatio) || 0.34) * globalThis.innerHeight),
+      GRAPH_MIN_HEIGHT,
+      globalThis.innerHeight
+    );
   } catch {
     state.layout.sidebarWidth = 300;
     state.layout.editorRatio = 0.52;
     state.layout.sidebarTagsHeight = 118;
-    state.layout.sidebarGraphRatio = 0.34;
+    state.layout.sidebarGraphHeight = 240;
   }
 }
 
@@ -243,18 +250,56 @@ function applyLayout() {
   const maxSidebar = Math.max(220, Math.min(620, windowWidth - 720));
   state.layout.sidebarWidth = clamp(state.layout.sidebarWidth, 220, maxSidebar);
   state.layout.editorRatio = clamp(state.layout.editorRatio, 0.28, 0.78);
-  state.layout.sidebarTagsHeight = clamp(state.layout.sidebarTagsHeight, 70, 220);
-  state.layout.sidebarGraphRatio = clamp(state.layout.sidebarGraphRatio, 0.2, 0.7);
+  state.layout.sidebarTagsHeight = clamp(state.layout.sidebarTagsHeight, TAGS_MIN_HEIGHT, globalThis.innerHeight);
+  state.layout.sidebarGraphHeight = clamp(state.layout.sidebarGraphHeight, GRAPH_MIN_HEIGHT, globalThis.innerHeight);
+  constrainSidebarPaneHeights();
 
   els.appShell.style.gridTemplateColumns = `${state.layout.sidebarWidth}px 6px minmax(0, 1fr)`;
-  const tagsRows = state.showTagsPane ? `6px minmax(70px, ${state.layout.sidebarTagsHeight}px)` : "0 0";
+  const tagsRows = state.showTagsPane ? `6px minmax(${TAGS_MIN_HEIGHT}px, ${state.layout.sidebarTagsHeight}px)` : "0 0";
   const graphRows = state.showGraphPane
-    ? `6px minmax(160px, calc(${state.layout.sidebarGraphRatio} * 100vh))`
+    ? `6px minmax(${GRAPH_MIN_HEIGHT}px, ${state.layout.sidebarGraphHeight}px)`
     : "0 0";
-  els.sidebar.style.gridTemplateRows = `auto auto minmax(120px, 1fr) ${tagsRows} ${graphRows}`;
+  els.sidebar.style.gridTemplateRows = `auto auto minmax(${FILE_TREE_MIN_HEIGHT}px, 1fr) ${tagsRows} ${graphRows}`;
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
   const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
   els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
+}
+
+function constrainSidebarPaneHeights() {
+  const available = availableSidebarPaneHeight();
+  const tagsMin = state.showTagsPane ? TAGS_MIN_HEIGHT : 0;
+  const graphMin = state.showGraphPane ? GRAPH_MIN_HEIGHT : 0;
+  const tagsMax = Math.max(tagsMin, available - graphMin);
+  const graphMax = Math.max(graphMin, available - tagsMin);
+
+  if (state.showTagsPane) state.layout.sidebarTagsHeight = clamp(state.layout.sidebarTagsHeight, tagsMin, tagsMax);
+  if (state.showGraphPane) state.layout.sidebarGraphHeight = clamp(state.layout.sidebarGraphHeight, graphMin, graphMax);
+
+  const total = (state.showTagsPane ? state.layout.sidebarTagsHeight : 0) +
+    (state.showGraphPane ? state.layout.sidebarGraphHeight : 0);
+  if (total > available && state.showGraphPane) {
+    state.layout.sidebarGraphHeight = Math.max(graphMin, state.layout.sidebarGraphHeight - (total - available));
+  }
+}
+
+function availableSidebarPaneHeight() {
+  const sidebarHeight = els.sidebar.getBoundingClientRect().height || globalThis.innerHeight || 900;
+  const brandHeight = els.sidebar.querySelector(".brand-bar")?.getBoundingClientRect().height || 0;
+  const searchHeight = els.sidebar.querySelector(".search-wrap")?.getBoundingClientRect().height || 0;
+  const resizerHeight = 6 * Number(state.showTagsPane) + 6 * Number(state.showGraphPane);
+  return Math.max(TAGS_MIN_HEIGHT + GRAPH_MIN_HEIGHT, sidebarHeight - brandHeight - searchHeight - resizerHeight - FILE_TREE_MIN_HEIGHT);
+}
+
+function maxTagsHeight() {
+  const available = availableSidebarPaneHeight();
+  const graphHeight = state.showGraphPane ? state.layout.sidebarGraphHeight : 0;
+  return Math.max(TAGS_MIN_HEIGHT, available - graphHeight);
+}
+
+function maxGraphHeight() {
+  const available = availableSidebarPaneHeight();
+  const tagsHeight = state.showTagsPane ? state.layout.sidebarTagsHeight : 0;
+  return Math.max(GRAPH_MIN_HEIGHT, available - tagsHeight);
 }
 
 function startResize(event, target) {
@@ -268,7 +313,7 @@ function startResize(event, target) {
     startSidebarWidth: state.layout.sidebarWidth,
     startEditorRatio: state.layout.editorRatio,
     startSidebarTagsHeight: state.layout.sidebarTagsHeight,
-    startSidebarGraphRatio: state.layout.sidebarGraphRatio,
+    startSidebarGraphHeight: state.layout.sidebarGraphHeight,
     workspaceLeft: workspaceRect.left,
     workspaceWidth: workspaceRect.width,
     sidebarTop: els.sidebar.getBoundingClientRect().top,
@@ -295,10 +340,14 @@ function onResizeMove(event) {
     const availableWidth = Math.max(1, resize.workspaceWidth - 6);
     state.layout.editorRatio = clamp(x / availableWidth, 0.28, 0.78);
   } else if (resize.target === "sidebarTags") {
-    state.layout.sidebarTagsHeight = clamp(resize.startSidebarTagsHeight - (event.clientY - resize.startY), 70, 220);
+    state.layout.sidebarTagsHeight = clamp(resize.startSidebarTagsHeight - (event.clientY - resize.startY), TAGS_MIN_HEIGHT, maxTagsHeight());
+  } else if (state.showTagsPane) {
+    const dy = event.clientY - resize.startY;
+    const combinedHeight = resize.startSidebarTagsHeight + resize.startSidebarGraphHeight;
+    state.layout.sidebarTagsHeight = clamp(resize.startSidebarTagsHeight + dy, TAGS_MIN_HEIGHT, combinedHeight - GRAPH_MIN_HEIGHT);
+    state.layout.sidebarGraphHeight = combinedHeight - state.layout.sidebarTagsHeight;
   } else {
-    const y = event.clientY - resize.sidebarTop;
-    state.layout.sidebarGraphRatio = clamp(1 - y / Math.max(1, resize.sidebarHeight), 0.2, 0.7);
+    state.layout.sidebarGraphHeight = clamp(resize.startSidebarGraphHeight - (event.clientY - resize.startY), GRAPH_MIN_HEIGHT, maxGraphHeight());
   }
 
   applyLayout();
@@ -358,7 +407,6 @@ function applyTagsPaneVisibility() {
 }
 
 function applyGraphPaneVisibility() {
-  els.sidebar.classList.toggle("graph-hidden", !state.showGraphPane);
   els.sidebarGraphResizer.hidden = !state.showGraphPane;
   els.sidebarGraphPane.hidden = !state.showGraphPane;
   applyLayout();
