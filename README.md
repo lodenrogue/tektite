@@ -16,7 +16,10 @@ There is no login, cloud sync service, telemetry, remote storage, account system
 - Reopen previously used vaults from `File > Recent Vaults...`.
 - Sync Git-backed vaults with a lightweight `git pull --ff-only`, `git add -A`, `git commit`, and `git push` action.
 - Browse folders, Markdown notes, and image assets in a collapsible file tree.
-- Resize the sidebar, editor, preview, and graph areas.
+- Search notes by filename, path, and Markdown content.
+- Collect `#tags` from Markdown notes into a clickable tag pane.
+- Click tags to filter the file tree by that tag.
+- Show or hide the Tags and Graph panes from the View menu.
 - Create new notes and folders from the file tree context menu.
 - Delete files and folders from the file tree context menu.
 - Move files, folders, and images by dragging them in the file tree.

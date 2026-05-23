@@ -120,9 +120,11 @@ const els = {
 boot();
 
 function boot() {
+  state.showFileExtensions = localStorage.getItem("tektite:showFileExtensions") === "1";
+  state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
+  state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
   loadLayout();
   applyLayout();
-  state.showFileExtensions = localStorage.getItem("tektite:showFileExtensions") === "1";
   updateSuffixButton();
   els.openVaultButton.addEventListener("click", chooseVault);
   els.refreshButton.addEventListener("click", refreshVault);
@@ -198,8 +200,6 @@ function boot() {
   globalThis.tektite.onToggleGraphPane(toggleGraphPane);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
-  state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
-  state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
   if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") !== "0") {
@@ -225,20 +225,40 @@ async function restoreLastVault() {
 function loadLayout() {
   try {
     const saved = JSON.parse(localStorage.getItem("tektite:layout") || "{}");
+    const defaultPaneHeight = defaultSidebarPaneHeight();
     state.layout.sidebarWidth = clamp(Number(saved.sidebarWidth) || 300, 220, 520);
     state.layout.editorRatio = clamp(Number(saved.editorRatio) || 0.52, 0.28, 0.78);
-    state.layout.sidebarTagsHeight = clamp(Number(saved.sidebarTagsHeight) || 118, TAGS_MIN_HEIGHT, globalThis.innerHeight);
+    state.layout.sidebarTagsHeight = clamp(
+      hasSavedLayoutNumber(saved.sidebarTagsHeight) ? Number(saved.sidebarTagsHeight) : defaultPaneHeight,
+      TAGS_MIN_HEIGHT,
+      globalThis.innerHeight
+    );
     state.layout.sidebarGraphHeight = clamp(
-      Number(saved.sidebarGraphHeight) || Math.round((Number(saved.sidebarGraphRatio) || 0.34) * globalThis.innerHeight),
+      savedGraphHeight(saved, defaultPaneHeight),
       GRAPH_MIN_HEIGHT,
       globalThis.innerHeight
     );
   } catch {
+    const defaultPaneHeight = defaultSidebarPaneHeight();
     state.layout.sidebarWidth = 300;
     state.layout.editorRatio = 0.52;
-    state.layout.sidebarTagsHeight = 118;
-    state.layout.sidebarGraphHeight = 240;
+    state.layout.sidebarTagsHeight = defaultPaneHeight;
+    state.layout.sidebarGraphHeight = defaultPaneHeight;
   }
+}
+
+function hasSavedLayoutNumber(value) {
+  return Number.isFinite(Number(value)) && Number(value) > 0;
+}
+
+function savedGraphHeight(saved, defaultPaneHeight) {
+  if (hasSavedLayoutNumber(saved.sidebarGraphHeight)) return Number(saved.sidebarGraphHeight);
+  if (hasSavedLayoutNumber(saved.sidebarGraphRatio)) return Math.round(Number(saved.sidebarGraphRatio) * globalThis.innerHeight);
+  return defaultPaneHeight;
+}
+
+function defaultSidebarPaneHeight() {
+  return Math.max(TAGS_MIN_HEIGHT, Math.round(availableSidebarPaneHeight() / 3));
 }
 
 function saveLayout() {
