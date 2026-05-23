@@ -77,7 +77,7 @@
       <p class="meta">Tektite v<span id="version">0.1.x</span> by Mathias Conradt · Apache 2.0 license</p>
     </main>
     <script>
-      const version = new URLSearchParams(window.location.search).get("version");
+      const version = new URLSearchParams(globalThis.location.search).get("version");
       if (version) document.getElementById("version").textContent = version;
     </script>
   </body>

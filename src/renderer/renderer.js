@@ -211,10 +211,10 @@ function boot() {
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
-  if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") !== "0") {
-    restoreLastVault().catch(() => showEmptyState());
-  } else {
+  if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") === "0") {
     showEmptyState();
+  } else {
+    restoreLastVault().catch(() => showEmptyState());
   }
 }
 
@@ -284,16 +284,28 @@ function applyLayout() {
   constrainSidebarPaneHeights();
 
   els.appShell.style.gridTemplateColumns = `${state.layout.sidebarWidth}px 6px minmax(0, 1fr)`;
-  const tagsRows = state.showTagsPane
-    ? `6px ${state.tagsContentCollapsed ? `${SIDEBAR_PANE_HEADER_HEIGHT}px` : `minmax(${TAGS_MIN_HEIGHT}px, ${state.layout.sidebarTagsHeight}px)`}`
-    : "0 0";
-  const graphRows = state.showGraphPane
-    ? `6px ${state.graphContentCollapsed ? `${SIDEBAR_PANE_HEADER_HEIGHT}px` : `minmax(${GRAPH_MIN_HEIGHT}px, ${state.layout.sidebarGraphHeight}px)`}`
-    : "0 0";
+  const tagsRows = sidebarPaneRows({
+    visible: state.showTagsPane,
+    collapsed: state.tagsContentCollapsed,
+    minHeight: TAGS_MIN_HEIGHT,
+    height: state.layout.sidebarTagsHeight
+  });
+  const graphRows = sidebarPaneRows({
+    visible: state.showGraphPane,
+    collapsed: state.graphContentCollapsed,
+    minHeight: GRAPH_MIN_HEIGHT,
+    height: state.layout.sidebarGraphHeight
+  });
   els.sidebar.style.gridTemplateRows = `auto auto minmax(${FILE_TREE_MIN_HEIGHT}px, 1fr) ${tagsRows} ${graphRows}`;
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
   const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
   els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
+}
+
+function sidebarPaneRows({ visible, collapsed, minHeight, height }) {
+  if (!visible) return "0 0";
+  if (collapsed) return `6px ${SIDEBAR_PANE_HEADER_HEIGHT}px`;
+  return `6px minmax(${minHeight}px, ${height}px)`;
 }
 
 function constrainSidebarPaneHeights() {

@@ -221,7 +221,7 @@ async function validateVaultRoot(rootPath, sender) {
   try {
     stat = await fs.stat(rootPath);
   } catch (error) {
-    if (error && error.code === "ENOENT") {
+    if (error?.code === "ENOENT") {
       return showVaultUnavailableDialog(sender, rootPath);
     }
     throw error;
@@ -1109,6 +1109,11 @@ async function gitProviderFor(rootPath) {
   }
 }
 
+function gitFailureReason({ timedOut, signal, exitCode }) {
+  if (timedOut) return "timeout";
+  return signal || exitCode;
+}
+
 async function runGit(rootPath, args, send = () => {}, options = {}) {
   const gitExecutable = await resolveGitExecutable();
   return new Promise((resolve) => {
@@ -1152,7 +1157,8 @@ async function runGit(rootPath, args, send = () => {}, options = {}) {
     child.on("close", (code, signal) => {
       clearTimeout(timeout);
       const exitCode = timedOut ? 1 : code || 0;
-      const status = exitCode === 0 ? "OK" : `FAILED (${timedOut ? "timeout" : signal || exitCode})`;
+      const failureReason = gitFailureReason({ timedOut, signal, exitCode });
+      const status = exitCode === 0 ? "OK" : `FAILED (${failureReason})`;
       if (!stdout.trim() && options.emptyOutput) send({ type: "chunk", text: `${options.emptyOutput}\n` });
       send({ type: "status", text: `${status}\n\n` });
       resolve({
