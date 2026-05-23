@@ -30,7 +30,11 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.on("menu:open-recent-vault", (_event, rootPath) => callback(rootPath)),
   onNewNote: (callback) => ipcRenderer.on("menu:new-note", callback),
   onCloseTab: (callback) => ipcRenderer.on("menu:close-tab", callback),
+  onCloseAllTabs: (callback) => ipcRenderer.on("menu:close-all-tabs", callback),
   onRefreshVault: (callback) => ipcRenderer.on("menu:refresh-vault", callback),
+  onToggleFileSuffixes: (callback) => ipcRenderer.on("menu:toggle-file-suffixes", callback),
+  onToggleTheme: (callback) => ipcRenderer.on("menu:toggle-theme", callback),
+  onToggleGraphPane: (callback) => ipcRenderer.on("menu:toggle-graph-pane", callback),
   onGitSyncOutput: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on("git:sync-output", listener);

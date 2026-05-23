@@ -12,6 +12,7 @@ const state = {
   selectedPath: "",
   selectedType: "folder",
   showFileExtensions: false,
+  showGraphPane: true,
   hasGitRepo: false,
   gitProvider: null,
   gitSyncInProgress: false,
@@ -86,6 +87,7 @@ const els = {
   graph: document.getElementById("graph"),
   graphSvg: document.getElementById("graphSvg"),
   graphEmpty: document.getElementById("graphEmpty"),
+  sidebarGraphPane: document.querySelector(".sidebar-graph-pane"),
   sidebar: document.querySelector(".sidebar"),
   appShell: document.querySelector(".app-shell"),
   workspace: document.querySelector(".workspace"),
@@ -178,9 +180,15 @@ function boot() {
   globalThis.tektite.onOpenRecentVault(openVault);
   globalThis.tektite.onNewNote(createNote);
   globalThis.tektite.onCloseTab(closeActiveEditorTab);
+  globalThis.tektite.onCloseAllTabs(closeAllEditorTabs);
   globalThis.tektite.onRefreshVault(refreshVault);
+  globalThis.tektite.onToggleFileSuffixes(toggleFileExtensions);
+  globalThis.tektite.onToggleTheme(toggleTheme);
+  globalThis.tektite.onToggleGraphPane(toggleGraphPane);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
+  state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
+  applyGraphPaneVisibility();
   if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") !== "0") {
     restoreLastVault().catch(() => showEmptyState());
   } else {
@@ -307,6 +315,20 @@ function toggleFileExtensions() {
   updateSuffixButton();
   renderTree();
   renderEditorTabs();
+}
+
+function toggleGraphPane() {
+  state.showGraphPane = !state.showGraphPane;
+  localStorage.setItem("tektite:showGraphPane", state.showGraphPane ? "1" : "0");
+  applyGraphPaneVisibility();
+}
+
+function applyGraphPaneVisibility() {
+  els.sidebar.classList.toggle("graph-hidden", !state.showGraphPane);
+  els.sidebarGraphResizer.hidden = !state.showGraphPane;
+  els.sidebarGraphPane.hidden = !state.showGraphPane;
+  applyLayout();
+  if (state.showGraphPane) updateGraph();
 }
 
 function updateSuffixButton() {
@@ -1241,6 +1263,12 @@ function closeActiveEditorTab() {
   closeEditorTab(state.activePath, state.activeType);
 }
 
+async function closeAllEditorTabs() {
+  if (state.openTabs.length === 0) return;
+  await flushActiveNote();
+  showEmptyState("Select or create a note.");
+}
+
 async function flushActiveNote() {
   if (state.activeType !== "note" || !state.activePath) return;
   state.activeContent = els.editor.value;
@@ -2000,6 +2028,7 @@ function decodeLink(value) {
 }
 
 function updateGraph() {
+  if (!state.showGraphPane) return;
   if (!state.notes.length) {
     drawGraph({ nodes: [], edges: [] });
     return;

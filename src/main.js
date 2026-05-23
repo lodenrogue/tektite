@@ -336,6 +336,10 @@ function buildMenu() {
           click: () => sendToActiveWindow("menu:close-tab")
         },
         {
+          label: "Close All Tabs",
+          click: () => sendToActiveWindow("menu:close-all-tabs")
+        },
+        {
           label: "Close Window",
           accelerator: "Shift+CmdOrCtrl+W",
           click: () => activeTektiteWindow()?.close()
@@ -363,6 +367,20 @@ function buildMenu() {
           accelerator: "CmdOrCtrl+R",
           click: () => sendToActiveWindow("menu:refresh-vault")
         },
+        { type: "separator" },
+        {
+          label: "Show/Hide File Suffixes",
+          click: () => sendToActiveWindow("menu:toggle-file-suffixes")
+        },
+        {
+          label: "Toggle Dark/Light Mode",
+          click: () => sendToActiveWindow("menu:toggle-theme")
+        },
+        {
+          label: "Show/Hide Graph Pane",
+          click: () => sendToActiveWindow("menu:toggle-graph-pane")
+        },
+        { type: "separator" },
         { role: "toggleDevTools" },
         { type: "separator" },
         { role: "resetZoom" },
