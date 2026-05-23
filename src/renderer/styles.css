@@ -101,14 +101,14 @@ button {
   min-width: 0;
   min-height: 0;
   height: 100vh;
-  grid-template-rows: auto auto minmax(120px, 1fr) 6px minmax(160px, calc(var(--sidebar-graph-ratio, 0.34) * 100vh));
+  grid-template-rows: auto auto minmax(120px, 1fr) 6px minmax(70px, 118px) 6px minmax(160px, 34vh);
   overflow: hidden;
   border-right: 1px solid var(--line);
   background: var(--sidebar);
 }
 
 .sidebar.graph-hidden {
-  grid-template-rows: auto auto minmax(120px, 1fr) 0 0;
+  grid-template-rows: auto auto minmax(120px, 1fr) 6px minmax(70px, 118px) 0 0;
 }
 
 .resizer {
@@ -488,6 +488,7 @@ button.tree-row {
 
 .editor-pane,
 .preview-pane,
+.sidebar-tags-pane,
 .sidebar-graph-pane {
   position: relative;
   display: flex;
@@ -495,6 +496,50 @@ button.tree-row {
   min-height: 0;
   flex-direction: column;
   background: var(--panel);
+}
+
+.sidebar-tags-pane {
+  border-top: 1px solid var(--line);
+}
+
+.tag-cloud {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 7px;
+  overflow: auto;
+  padding: 10px 12px 12px;
+}
+
+.resizer-y[hidden],
+.sidebar-tags-pane[hidden],
+.sidebar-graph-pane[hidden] {
+  display: none;
+}
+
+.tag-chip {
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tag-chip:hover {
+  border-color: var(--tree-active-bg);
+  background: var(--tree-active-bg);
+  color: var(--tree-active-ink);
+}
+
+.tag-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .editor-pane {

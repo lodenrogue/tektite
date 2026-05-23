@@ -377,6 +377,10 @@ function buildMenu() {
           click: () => sendToActiveWindow("menu:toggle-theme")
         },
         {
+          label: "Show/Hide Tags Pane",
+          click: () => sendToActiveWindow("menu:toggle-tags-pane")
+        },
+        {
           label: "Show/Hide Graph Pane",
           click: () => sendToActiveWindow("menu:toggle-graph-pane")
         },

@@ -5,6 +5,7 @@ const state = {
   noteByPath: new Map(),
   noteByTitle: new Map(),
   noteContent: new Map(),
+  tags: [],
   activePath: null,
   activeType: null,
   activeContent: "",
@@ -12,6 +13,7 @@ const state = {
   selectedPath: "",
   selectedType: "folder",
   showFileExtensions: false,
+  showTagsPane: true,
   showGraphPane: true,
   hasGitRepo: false,
   gitProvider: null,
@@ -24,6 +26,7 @@ const state = {
   layout: {
     sidebarWidth: 300,
     editorRatio: 0.52,
+    sidebarTagsHeight: 118,
     sidebarGraphRatio: 0.34
   },
   activeResize: null,
@@ -87,6 +90,9 @@ const els = {
   graph: document.getElementById("graph"),
   graphSvg: document.getElementById("graphSvg"),
   graphEmpty: document.getElementById("graphEmpty"),
+  tagCloud: document.getElementById("tagCloud"),
+  sidebarTagsPane: document.querySelector(".sidebar-tags-pane"),
+  sidebarTagsResizer: document.getElementById("sidebarTagsResizer"),
   sidebarGraphPane: document.querySelector(".sidebar-graph-pane"),
   sidebar: document.querySelector(".sidebar"),
   appShell: document.querySelector(".app-shell"),
@@ -141,6 +147,7 @@ function boot() {
   els.graphSvg.addEventListener("pointerdown", onGraphPointerDown);
   els.sidebarResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebar"));
   els.workspaceResizer.addEventListener("pointerdown", (event) => startResize(event, "editor"));
+  els.sidebarTagsResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebarTags"));
   els.sidebarGraphResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebarGraph"));
   els.nameForm.addEventListener("submit", onNameSubmit);
   els.cancelNameButton.addEventListener("click", () => closeNameDialog(null));
@@ -184,10 +191,13 @@ function boot() {
   globalThis.tektite.onRefreshVault(refreshVault);
   globalThis.tektite.onToggleFileSuffixes(toggleFileExtensions);
   globalThis.tektite.onToggleTheme(toggleTheme);
+  globalThis.tektite.onToggleTagsPane(toggleTagsPane);
   globalThis.tektite.onToggleGraphPane(toggleGraphPane);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
+  state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
   state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
+  applyTagsPaneVisibility();
   applyGraphPaneVisibility();
   if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") !== "0") {
     restoreLastVault().catch(() => showEmptyState());
@@ -214,10 +224,12 @@ function loadLayout() {
     const saved = JSON.parse(localStorage.getItem("tektite:layout") || "{}");
     state.layout.sidebarWidth = clamp(Number(saved.sidebarWidth) || 300, 220, 520);
     state.layout.editorRatio = clamp(Number(saved.editorRatio) || 0.52, 0.28, 0.78);
+    state.layout.sidebarTagsHeight = clamp(Number(saved.sidebarTagsHeight) || 118, 70, 220);
     state.layout.sidebarGraphRatio = clamp(Number(saved.sidebarGraphRatio) || 0.34, 0.2, 0.7);
   } catch {
     state.layout.sidebarWidth = 300;
     state.layout.editorRatio = 0.52;
+    state.layout.sidebarTagsHeight = 118;
     state.layout.sidebarGraphRatio = 0.34;
   }
 }
@@ -231,13 +243,18 @@ function applyLayout() {
   const maxSidebar = Math.max(220, Math.min(620, windowWidth - 720));
   state.layout.sidebarWidth = clamp(state.layout.sidebarWidth, 220, maxSidebar);
   state.layout.editorRatio = clamp(state.layout.editorRatio, 0.28, 0.78);
+  state.layout.sidebarTagsHeight = clamp(state.layout.sidebarTagsHeight, 70, 220);
   state.layout.sidebarGraphRatio = clamp(state.layout.sidebarGraphRatio, 0.2, 0.7);
 
   els.appShell.style.gridTemplateColumns = `${state.layout.sidebarWidth}px 6px minmax(0, 1fr)`;
+  const tagsRows = state.showTagsPane ? `6px minmax(70px, ${state.layout.sidebarTagsHeight}px)` : "0 0";
+  const graphRows = state.showGraphPane
+    ? `6px minmax(160px, calc(${state.layout.sidebarGraphRatio} * 100vh))`
+    : "0 0";
+  els.sidebar.style.gridTemplateRows = `auto auto minmax(120px, 1fr) ${tagsRows} ${graphRows}`;
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
   const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
   els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
-  els.sidebar.style.setProperty("--sidebar-graph-ratio", state.layout.sidebarGraphRatio);
 }
 
 function startResize(event, target) {
@@ -247,8 +264,10 @@ function startResize(event, target) {
     target,
     pointerId: event.pointerId,
     startX: event.clientX,
+    startY: event.clientY,
     startSidebarWidth: state.layout.sidebarWidth,
     startEditorRatio: state.layout.editorRatio,
+    startSidebarTagsHeight: state.layout.sidebarTagsHeight,
     startSidebarGraphRatio: state.layout.sidebarGraphRatio,
     workspaceLeft: workspaceRect.left,
     workspaceWidth: workspaceRect.width,
@@ -257,7 +276,7 @@ function startResize(event, target) {
   };
 
   event.currentTarget.setPointerCapture(event.pointerId);
-  document.body.classList.add(target === "sidebarGraph" ? "resizing-y" : "resizing");
+  document.body.classList.add(target === "sidebarGraph" || target === "sidebarTags" ? "resizing-y" : "resizing");
   globalThis.addEventListener("pointermove", onResizeMove);
   globalThis.addEventListener("pointerup", stopResize, { once: true });
   globalThis.addEventListener("pointercancel", stopResize, { once: true });
@@ -275,6 +294,8 @@ function onResizeMove(event) {
     const x = event.clientX - resize.workspaceLeft;
     const availableWidth = Math.max(1, resize.workspaceWidth - 6);
     state.layout.editorRatio = clamp(x / availableWidth, 0.28, 0.78);
+  } else if (resize.target === "sidebarTags") {
+    state.layout.sidebarTagsHeight = clamp(resize.startSidebarTagsHeight - (event.clientY - resize.startY), 70, 220);
   } else {
     const y = event.clientY - resize.sidebarTop;
     state.layout.sidebarGraphRatio = clamp(1 - y / Math.max(1, resize.sidebarHeight), 0.2, 0.7);
@@ -321,6 +342,19 @@ function toggleGraphPane() {
   state.showGraphPane = !state.showGraphPane;
   localStorage.setItem("tektite:showGraphPane", state.showGraphPane ? "1" : "0");
   applyGraphPaneVisibility();
+}
+
+function toggleTagsPane() {
+  state.showTagsPane = !state.showTagsPane;
+  localStorage.setItem("tektite:showTagsPane", state.showTagsPane ? "1" : "0");
+  applyTagsPaneVisibility();
+}
+
+function applyTagsPaneVisibility() {
+  els.sidebarTagsResizer.hidden = !state.showTagsPane;
+  els.sidebarTagsPane.hidden = !state.showTagsPane;
+  applyLayout();
+  if (state.showTagsPane) renderTags();
 }
 
 function applyGraphPaneVisibility() {
@@ -408,6 +442,7 @@ async function openVault(rootPath) {
     loadCollapsedFolders();
     indexNotes();
     await loadGraphContent();
+    renderTags();
 
     localStorage.setItem("tektite:lastVault", rootPath);
     const vaultName = rootPath.split(/[\\/]/).pop() || rootPath;
@@ -454,6 +489,7 @@ async function refreshVault(options = {}) {
   indexNotes();
   reconcileOpenTabs();
   await loadGraphContent();
+  renderTags();
   if (selectedPath && entryExists(selectedPath, selectedType)) {
     state.selectedPath = selectedPath;
     state.selectedType = selectedType;
@@ -1293,6 +1329,7 @@ function onEditorInput() {
   if (state.activeType !== "note") return;
   if (state.editorHistory.restoring) return;
   state.activeContent = els.editor.value;
+  if (state.activePath) state.noteContent.set(state.activePath, state.activeContent);
   renderPreview(state.activeContent);
   updateMentionMenu();
   recordEditorHistory();
@@ -1407,6 +1444,7 @@ async function saveActiveNote() {
   state.notes = vault.notes;
   indexNotes();
   reconcileOpenTabs();
+  renderTags();
   renderEditorTabs();
   renderTree();
   updateGraph();
@@ -1421,6 +1459,8 @@ function showEmptyState(message = "Choose a local folder to start.") {
   state.previewForwardHistory = [];
   state.hasGitRepo = false;
   state.gitProvider = null;
+  state.tags = [];
+  els.tagCloud.innerHTML = "";
   els.editor.value = "";
   els.editor.disabled = true;
   els.editor.classList.remove("hidden");
@@ -1634,7 +1674,7 @@ function renderTreeNode(node, query) {
 
 function renderTreeLeafNode(node, query) {
   const label = displayNoteLabel(node);
-  if (query && !node.title.toLowerCase().includes(query) && !node.path.toLowerCase().includes(query)) {
+  if (query && !treeLeafMatchesQuery(node, query)) {
     return null;
   }
 
@@ -1650,6 +1690,66 @@ function renderTreeLeafNode(node, query) {
     else openAsset(node.path);
   });
   return button;
+}
+
+function treeLeafMatchesQuery(node, query) {
+  const searchableLabel = `${node.title || ""} ${node.name || ""} ${node.path || ""}`.toLowerCase();
+  if (searchableLabel.includes(query)) return true;
+  if (node.type !== "note") return false;
+
+  const content = noteContentForSearch(node.path);
+  return content.toLowerCase().includes(query);
+}
+
+function noteContentForSearch(notePath) {
+  if (notePath === state.activePath && state.activeType === "note") return state.activeContent;
+  return state.noteContent.get(notePath) || "";
+}
+
+function renderTags() {
+  state.tags = collectVaultTags();
+  els.tagCloud.innerHTML = "";
+
+  if (state.tags.length === 0) {
+    els.tagCloud.innerHTML = `<p class="tag-empty">No tags yet</p>`;
+    return;
+  }
+
+  for (const tag of state.tags) {
+    const button = document.createElement("button");
+    button.className = "tag-chip";
+    button.type = "button";
+    button.textContent = tag;
+    button.addEventListener("click", () => {
+      els.searchInput.value = tag;
+      renderTree();
+      els.searchInput.focus();
+    });
+    els.tagCloud.appendChild(button);
+  }
+}
+
+function collectVaultTags() {
+  const tags = new Map();
+  for (const note of state.notes) {
+    const content = noteContentForSearch(note.path);
+    for (const tag of extractTags(content)) {
+      const key = tag.toLowerCase();
+      if (!tags.has(key)) tags.set(key, tag);
+    }
+  }
+
+  return [...tags.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function extractTags(markdown) {
+  const tags = [];
+  const pattern = /(^|[\s([{>"'])#([A-Za-z0-9][A-Za-z0-9_-]*)/g;
+  let match;
+  while ((match = pattern.exec(markdown))) {
+    tags.push(`#${match[2]}`);
+  }
+  return tags;
 }
 
 function renderTreeFolderNode(node, query) {

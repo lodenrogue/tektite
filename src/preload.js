@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("tektite", {
   onRefreshVault: (callback) => ipcRenderer.on("menu:refresh-vault", callback),
   onToggleFileSuffixes: (callback) => ipcRenderer.on("menu:toggle-file-suffixes", callback),
   onToggleTheme: (callback) => ipcRenderer.on("menu:toggle-theme", callback),
+  onToggleTagsPane: (callback) => ipcRenderer.on("menu:toggle-tags-pane", callback),
   onToggleGraphPane: (callback) => ipcRenderer.on("menu:toggle-graph-pane", callback),
   onGitSyncOutput: (callback) => {
     const listener = (_event, payload) => callback(payload);
