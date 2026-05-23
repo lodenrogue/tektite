@@ -15,6 +15,8 @@ const state = {
   showFileExtensions: false,
   showTagsPane: true,
   showGraphPane: true,
+  tagsContentCollapsed: false,
+  graphContentCollapsed: false,
   hasGitRepo: false,
   gitProvider: null,
   gitSyncInProgress: false,
@@ -59,6 +61,7 @@ const WORKSPACE_STORAGE_PREFIX = "tektite:workspace:";
 const FILE_TREE_MIN_HEIGHT = 56;
 const TAGS_MIN_HEIGHT = 56;
 const GRAPH_MIN_HEIGHT = 100;
+const SIDEBAR_PANE_HEADER_HEIGHT = 42;
 
 const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
   localStorage.getItem("tektite:verbose") === "1";
@@ -94,6 +97,8 @@ const els = {
   graphSvg: document.getElementById("graphSvg"),
   graphEmpty: document.getElementById("graphEmpty"),
   tagCloud: document.getElementById("tagCloud"),
+  collapseTagsButton: document.getElementById("collapseTagsButton"),
+  collapseGraphButton: document.getElementById("collapseGraphButton"),
   sidebarTagsPane: document.querySelector(".sidebar-tags-pane"),
   sidebarTagsResizer: document.getElementById("sidebarTagsResizer"),
   sidebarGraphPane: document.querySelector(".sidebar-graph-pane"),
@@ -123,6 +128,8 @@ function boot() {
   state.showFileExtensions = localStorage.getItem("tektite:showFileExtensions") === "1";
   state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
   state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
+  state.tagsContentCollapsed = localStorage.getItem("tektite:tagsContentCollapsed") === "1";
+  state.graphContentCollapsed = localStorage.getItem("tektite:graphContentCollapsed") === "1";
   loadLayout();
   applyLayout();
   updateSuffixButton();
@@ -154,6 +161,8 @@ function boot() {
   els.workspaceResizer.addEventListener("pointerdown", (event) => startResize(event, "editor"));
   els.sidebarTagsResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebarTags"));
   els.sidebarGraphResizer.addEventListener("pointerdown", (event) => startResize(event, "sidebarGraph"));
+  els.collapseTagsButton.addEventListener("click", toggleTagsContent);
+  els.collapseGraphButton.addEventListener("click", toggleGraphContent);
   els.nameForm.addEventListener("submit", onNameSubmit);
   els.cancelNameButton.addEventListener("click", () => closeNameDialog(null));
   els.cancelNameXButton.addEventListener("click", () => closeNameDialog(null));
@@ -275,9 +284,11 @@ function applyLayout() {
   constrainSidebarPaneHeights();
 
   els.appShell.style.gridTemplateColumns = `${state.layout.sidebarWidth}px 6px minmax(0, 1fr)`;
-  const tagsRows = state.showTagsPane ? `6px minmax(${TAGS_MIN_HEIGHT}px, ${state.layout.sidebarTagsHeight}px)` : "0 0";
+  const tagsRows = state.showTagsPane
+    ? `6px ${state.tagsContentCollapsed ? `${SIDEBAR_PANE_HEADER_HEIGHT}px` : `minmax(${TAGS_MIN_HEIGHT}px, ${state.layout.sidebarTagsHeight}px)`}`
+    : "0 0";
   const graphRows = state.showGraphPane
-    ? `6px minmax(${GRAPH_MIN_HEIGHT}px, ${state.layout.sidebarGraphHeight}px)`
+    ? `6px ${state.graphContentCollapsed ? `${SIDEBAR_PANE_HEADER_HEIGHT}px` : `minmax(${GRAPH_MIN_HEIGHT}px, ${state.layout.sidebarGraphHeight}px)`}`
     : "0 0";
   els.sidebar.style.gridTemplateRows = `auto auto minmax(${FILE_TREE_MIN_HEIGHT}px, 1fr) ${tagsRows} ${graphRows}`;
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
@@ -287,16 +298,16 @@ function applyLayout() {
 
 function constrainSidebarPaneHeights() {
   const available = availableSidebarPaneHeight();
-  const tagsMin = state.showTagsPane ? TAGS_MIN_HEIGHT : 0;
-  const graphMin = state.showGraphPane ? GRAPH_MIN_HEIGHT : 0;
+  const tagsMin = state.showTagsPane && !state.tagsContentCollapsed ? TAGS_MIN_HEIGHT : 0;
+  const graphMin = state.showGraphPane && !state.graphContentCollapsed ? GRAPH_MIN_HEIGHT : 0;
   const tagsMax = Math.max(tagsMin, available - graphMin);
   const graphMax = Math.max(graphMin, available - tagsMin);
 
   if (state.showTagsPane) state.layout.sidebarTagsHeight = clamp(state.layout.sidebarTagsHeight, tagsMin, tagsMax);
   if (state.showGraphPane) state.layout.sidebarGraphHeight = clamp(state.layout.sidebarGraphHeight, graphMin, graphMax);
 
-  const total = (state.showTagsPane ? state.layout.sidebarTagsHeight : 0) +
-    (state.showGraphPane ? state.layout.sidebarGraphHeight : 0);
+  const total = (state.showTagsPane && !state.tagsContentCollapsed ? state.layout.sidebarTagsHeight : 0) +
+    (state.showGraphPane && !state.graphContentCollapsed ? state.layout.sidebarGraphHeight : 0);
   if (total > available && state.showGraphPane) {
     state.layout.sidebarGraphHeight = Math.max(graphMin, state.layout.sidebarGraphHeight - (total - available));
   }
@@ -307,7 +318,13 @@ function availableSidebarPaneHeight() {
   const brandHeight = els.sidebar.querySelector(".brand-bar")?.getBoundingClientRect().height || 0;
   const searchHeight = els.sidebar.querySelector(".search-wrap")?.getBoundingClientRect().height || 0;
   const resizerHeight = 6 * Number(state.showTagsPane) + 6 * Number(state.showGraphPane);
-  return Math.max(TAGS_MIN_HEIGHT + GRAPH_MIN_HEIGHT, sidebarHeight - brandHeight - searchHeight - resizerHeight - FILE_TREE_MIN_HEIGHT);
+  const collapsedHeaderHeight =
+    SIDEBAR_PANE_HEADER_HEIGHT * Number(state.showTagsPane && state.tagsContentCollapsed) +
+    SIDEBAR_PANE_HEADER_HEIGHT * Number(state.showGraphPane && state.graphContentCollapsed);
+  return Math.max(
+    TAGS_MIN_HEIGHT + GRAPH_MIN_HEIGHT,
+    sidebarHeight - brandHeight - searchHeight - resizerHeight - FILE_TREE_MIN_HEIGHT - collapsedHeaderHeight
+  );
 }
 
 function maxTagsHeight() {
@@ -419,18 +436,54 @@ function toggleTagsPane() {
   applyTagsPaneVisibility();
 }
 
+function toggleTagsContent() {
+  state.tagsContentCollapsed = !state.tagsContentCollapsed;
+  localStorage.setItem("tektite:tagsContentCollapsed", state.tagsContentCollapsed ? "1" : "0");
+  applyTagsContentVisibility();
+}
+
+function toggleGraphContent() {
+  state.graphContentCollapsed = !state.graphContentCollapsed;
+  localStorage.setItem("tektite:graphContentCollapsed", state.graphContentCollapsed ? "1" : "0");
+  applyGraphContentVisibility();
+}
+
 function applyTagsPaneVisibility() {
   els.sidebarTagsResizer.hidden = !state.showTagsPane;
   els.sidebarTagsPane.hidden = !state.showTagsPane;
   applyLayout();
-  if (state.showTagsPane) renderTags();
+  if (state.showTagsPane) {
+    applyTagsContentVisibility();
+    renderTags();
+  }
 }
 
 function applyGraphPaneVisibility() {
   els.sidebarGraphResizer.hidden = !state.showGraphPane;
   els.sidebarGraphPane.hidden = !state.showGraphPane;
   applyLayout();
-  if (state.showGraphPane) updateGraph();
+  if (state.showGraphPane) applyGraphContentVisibility();
+}
+
+function applyTagsContentVisibility() {
+  els.sidebarTagsPane.classList.toggle("content-collapsed", state.tagsContentCollapsed);
+  els.collapseTagsButton.textContent = state.tagsContentCollapsed ? "+" : "-";
+  els.collapseTagsButton.setAttribute(
+    "aria-label",
+    state.tagsContentCollapsed ? "Expand Tags pane" : "Collapse Tags pane"
+  );
+  applyLayout();
+}
+
+function applyGraphContentVisibility() {
+  els.sidebarGraphPane.classList.toggle("content-collapsed", state.graphContentCollapsed);
+  els.collapseGraphButton.textContent = state.graphContentCollapsed ? "+" : "-";
+  els.collapseGraphButton.setAttribute(
+    "aria-label",
+    state.graphContentCollapsed ? "Expand Graph pane" : "Collapse Graph pane"
+  );
+  applyLayout();
+  if (state.showGraphPane && !state.graphContentCollapsed) updateGraph();
 }
 
 function updateSuffixButton() {
@@ -2197,6 +2250,7 @@ function decodeLink(value) {
 
 function updateGraph() {
   if (!state.showGraphPane) return;
+  if (state.graphContentCollapsed) return;
   if (!state.notes.length) {
     drawGraph({ nodes: [], edges: [] });
     return;

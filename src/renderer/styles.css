@@ -754,6 +754,8 @@ button.tree-row {
   display: flex;
   min-height: 42px;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   border-bottom: 1px solid var(--line);
   background: var(--panel-strong);
   padding: 0 14px;
@@ -761,6 +763,31 @@ button.tree-row {
   font-size: 12px;
   font-weight: 680;
   text-transform: uppercase;
+}
+
+.pane-collapse-button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.pane-collapse-button:hover {
+  border-color: var(--tree-active-bg);
+  background: var(--tree-active-bg);
+  color: var(--tree-active-ink);
+}
+
+.sidebar-tags-pane.content-collapsed .tag-cloud,
+.sidebar-graph-pane.content-collapsed .graph-view {
+  display: none;
 }
 
 .preview-pane > .pane-header {
