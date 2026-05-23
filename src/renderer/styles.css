@@ -355,7 +355,7 @@ body.resizing-y textarea {
 
 .search-wrap {
   grid-area: search;
-  padding: 0 12px 12px;
+  padding: 12px;
 }
 
 #searchInput {
