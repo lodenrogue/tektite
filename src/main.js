@@ -543,6 +543,8 @@ ipcMain.handle("git:sync", async (event, rootPath) => {
     return fail("This vault does not contain a .git directory.");
   }
 
+  await checkSshAuth(rootPath, send);
+
   const outputs = [];
   let pull;
   try {
@@ -1112,6 +1114,40 @@ async function gitProviderFor(rootPath) {
 function gitFailureReason({ timedOut, signal, exitCode }) {
   if (timedOut) return "timeout";
   return signal || exitCode;
+}
+
+async function checkSshAuth(rootPath, send) {
+  const remoteResult = await runGit(rootPath, ["remote", "get-url", "origin"]);
+  if (remoteResult.code !== 0) return;
+
+  const remoteUrl = remoteResult.stdout.trim();
+  if (!remoteUrl || remoteUrl.startsWith("http://") || remoteUrl.startsWith("https://")) return;
+
+  // SSH URL: git@github.com:user/repo.git or ssh://git@github.com/user/repo.git
+  const hostMatch = remoteUrl.match(/[@/]([a-zA-Z0-9._-]+)[:/]/);
+  if (!hostMatch) return;
+  const host = hostMatch[1];
+
+  const { execFile } = require("node:child_process");
+  await new Promise((resolve) => {
+    execFile(
+      "ssh",
+      ["-T", `git@${host}`, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new"],
+      { env: { ...process.env, SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK || "" } },
+      (error, _stdout, stderr) => {
+        // exit code 1 with "successfully authenticated" is normal for GitHub/GitLab
+        const output = (stderr || "").toLowerCase();
+        const authenticated = !error || output.includes("successfully authenticated") || output.includes("welcome to");
+        if (!authenticated) {
+          send({
+            type: "chunk",
+            text: `Warning: SSH authentication to ${host} failed. Git sync will likely fail.\n${stderr ? stderr.trim() + "\n" : ""}`
+          });
+        }
+        resolve();
+      }
+    );
+  });
 }
 
 async function runGit(rootPath, args, send = () => {}, options = {}) {
