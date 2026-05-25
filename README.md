@@ -3,6 +3,7 @@
 [![macOS Build](https://github.com/mathiasconradt/tektite/actions/workflows/macos-build.yml/badge.svg)](https://github.com/mathiasconradt/tektite/actions/workflows/macos-build.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mathiasconradt_tektite&metric=alert_status&token=27834731d82afc73030bc1e8559b67ac51f516d1)](https://sonarcloud.io/summary/new_code?id=mathiasconradt_tektite)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+![GitHub stars](https://img.shields.io/github/stars/mathiasconradt/tektite)
 
 ![Tektite](docs/images/promo.png)
 
