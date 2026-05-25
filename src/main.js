@@ -24,7 +24,7 @@ const gitExecutableCandidates = [
   "/opt/homebrew/bin/git"
 ];
 const gitSafePath = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin";
-const splashMinimumMs = 5000;
+const splashMinimumMs = 3000;
 const recentVaultLimit = 10;
 
 app.name = "Tektite";
