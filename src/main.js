@@ -1133,7 +1133,7 @@ async function checkSshAuth(rootPath, send) {
     execFile(
       "ssh",
       ["-T", `git@${host}`, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new"],
-      { env: { ...process.env, SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK || "" } },
+      { env: { PATH: gitSafePath, SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK || "" } },
       (error, _stdout, stderr) => {
         // exit code 1 with "successfully authenticated" is normal for GitHub/GitLab
         const output = (stderr || "").toLowerCase();
