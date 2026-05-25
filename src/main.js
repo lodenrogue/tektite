@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
 const path = require("node:path");
 
 let mainWindow;
@@ -10,6 +11,7 @@ let splashShownAt = 0;
 let recentVaults = [];
 let isQuitting = false;
 const windowVaults = new Map();
+let cachedStore = { lastVault: null, workspaces: {}, sessions: [] };
 const tektiteWindows = new Set();
 const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includes("tektite");
 const appIconPath = path.join(__dirname, "..", "assets", "app", "tektive-icon.webp");
@@ -270,22 +272,28 @@ async function loadWorkspaceStore() {
   try {
     const raw = await fs.readFile(workspaceStatePath(), "utf8");
     const parsed = JSON.parse(raw);
-    return {
+    cachedStore = {
       lastVault: typeof parsed.lastVault === "string" ? parsed.lastVault : null,
       workspaces: parsed.workspaces && typeof parsed.workspaces === "object" ? parsed.workspaces : {},
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : []
     };
   } catch {
-    return { lastVault: null, workspaces: {}, sessions: [] };
+    cachedStore = { lastVault: null, workspaces: {}, sessions: [] };
   }
+  return { ...cachedStore, workspaces: { ...cachedStore.workspaces } };
 }
 
 async function saveWorkspaceStore(store) {
-  await fs.mkdir(path.dirname(workspaceStatePath()), { recursive: true });
-  await fs.writeFile(workspaceStatePath(), JSON.stringify(store, null, 2), "utf8");
+  cachedStore = store;
+  const p = workspaceStatePath();
+  const tmp = `${p}.tmp`;
+  await fs.mkdir(path.dirname(p), { recursive: true });
+  await fs.writeFile(tmp, JSON.stringify(store, null, 2), "utf8");
+  await fs.rename(tmp, p);
 }
 
 async function saveOpenSessions() {
+  if (isQuitting) return;
   const sessions = [...tektiteWindows]
     .filter((w) => !w.isDestroyed())
     .map((w) => windowVaults.get(w) || null);
@@ -475,6 +483,20 @@ function toggleMaximize(window) {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  try {
+    const sessions = [...tektiteWindows]
+      .filter((w) => !w.isDestroyed())
+      .map((w) => windowVaults.get(w) || null);
+    cachedStore.sessions = sessions;
+    const p = workspaceStatePath();
+    const tmp = `${p}.tmp`;
+    fsSync.mkdirSync(path.dirname(p), { recursive: true });
+    fsSync.writeFileSync(tmp, JSON.stringify(cachedStore, null, 2), "utf8");
+    fsSync.renameSync(tmp, p);
+    log("before-quit sessions saved", sessions);
+  } catch (e) {
+    log("before-quit sessions save failed", e.message);
+  }
 });
 
 app.on("ready", async () => {
@@ -485,7 +507,7 @@ app.on("ready", async () => {
 
   const store = await loadWorkspaceStore();
   const sessions = Array.isArray(store.sessions) && store.sessions.length > 0
-    ? store.sessions.filter((v) => typeof v === "string" && v)
+    ? store.sessions.filter((v) => v === null || (typeof v === "string" && v))
     : null;
 
   if (sessions) {
@@ -556,13 +578,14 @@ ipcMain.handle("workspace:save", async (event, rootPath, workspace) => {
   const store = await loadWorkspaceStore();
   store.lastVault = normalizedRoot;
   store.workspaces[normalizedRoot] = workspace && typeof workspace === "object" ? workspace : {};
-  store.sessions = [...tektiteWindows].filter((w) => !w.isDestroyed()).map((w) => windowVaults.get(w) || null);
+  if (!isQuitting) {
+    store.sessions = [...tektiteWindows].filter((w) => !w.isDestroyed()).map((w) => windowVaults.get(w) || null);
+  }
   await saveWorkspaceStore(store);
   return true;
 });
 
-ipcMain.handle("window:register", (event) => {
-  saveOpenSessions();
+ipcMain.handle("window:register", () => {
   return true;
 });
 
