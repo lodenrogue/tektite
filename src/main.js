@@ -59,7 +59,7 @@ function createWindow(options = {}) {
 
   window.loadFile(path.join(__dirname, "renderer", "index.html"), {
     query: {
-      restoreLastVault: options.vaultPath ? "0" : (options.restoreLastVault === false ? "0" : "1"),
+      restoreLastVault: (options.vaultPath || options.restoreLastVault === false) ? "0" : "1",
       ...(options.vaultPath ? { vault: options.vaultPath } : {})
     }
   });

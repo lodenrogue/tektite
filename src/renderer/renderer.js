@@ -1575,19 +1575,23 @@ function restoreEditorHistory(delta) {
   state.editorHistory.restoring = false;
 }
 
-function onEditorKeydown(event) {
-  if (state.find.active) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      navigateFind(event.shiftKey ? -1 : 1);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeFindBar();
-      return;
-    }
+function onFindBarKeydown(event) {
+  if (!state.find.active) return false;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    navigateFind(event.shiftKey ? -1 : 1);
+    return true;
   }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeFindBar();
+    return true;
+  }
+  return false;
+}
+
+function onEditorKeydown(event) {
+  if (onFindBarKeydown(event)) return;
 
   const key = event.key.toLowerCase();
   if ((event.metaKey || event.ctrlKey) && key === "z") {
