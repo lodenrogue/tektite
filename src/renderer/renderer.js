@@ -1877,7 +1877,7 @@ function collectVaultTags() {
 
 function extractTags(markdown) {
   const tags = [];
-  const pattern = /(^|[\s([{>"'])#([A-Za-z0-9][A-Za-z0-9_-]*)/g;
+  const pattern = /(^|\s)#([A-Za-z0-9][A-Za-z0-9_-]*)/g;
   let match;
   while ((match = pattern.exec(markdown))) {
     tags.push(`#${match[2]}`);
