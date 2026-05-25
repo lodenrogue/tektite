@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -398,14 +398,16 @@ function buildMenu() {
       label: "Window",
       submenu: windowMenuItems(isMac)
     },
-    ...(isMac
-      ? []
-      : [
-          {
-            label: "Help",
-            submenu: [{ label: "About Tektite", click: showAboutWindow }]
-          }
-        ])
+    {
+      label: "Help",
+      submenu: [
+        {
+          label: "Open Documentation",
+          click: () => shell.openExternal("https://github.com/mathiasconradt/tektite/blob/main/docs/user-guide.md")
+        },
+        ...(isMac ? [] : [{ type: "separator" }, { label: "About Tektite", click: showAboutWindow }])
+      ]
+    }
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
