@@ -243,7 +243,9 @@ function boot() {
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
-  if (new URLSearchParams(globalThis.location.search).get("restoreLastVault") === "0") {
+  globalThis.tektite.registerWindow();
+  const params = new URLSearchParams(globalThis.location.search);
+  if (params.get("restoreLastVault") === "0" && !params.get("vault")) {
     showEmptyState();
   } else {
     restoreLastVault().catch(() => showEmptyState());
@@ -251,6 +253,17 @@ function boot() {
 }
 
 async function restoreLastVault() {
+  const params = new URLSearchParams(globalThis.location.search);
+  const specificVault = params.get("vault");
+  if (specificVault) {
+    try {
+      await openVault(specificVault);
+    } catch {
+      showEmptyState();
+    }
+    return;
+  }
+
   const persisted = await globalThis.tektite.loadWorkspaceState("");
   const lastVault = persisted?.lastVault || localStorage.getItem("tektite:lastVault");
   if (!lastVault) return;

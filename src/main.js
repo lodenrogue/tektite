@@ -8,6 +8,8 @@ let aboutWindow;
 let splashWindow;
 let splashShownAt = 0;
 let recentVaults = [];
+let isQuitting = false;
+const windowVaults = new Map();
 const tektiteWindows = new Set();
 const verbose = process.env.TEKTITE_VERBOSE === "1" || process.env.DEBUG?.includes("tektite");
 const appIconPath = path.join(__dirname, "..", "assets", "app", "tektive-icon.webp");
@@ -55,7 +57,8 @@ function createWindow(options = {}) {
 
   window.loadFile(path.join(__dirname, "renderer", "index.html"), {
     query: {
-      restoreLastVault: options.restoreLastVault === false ? "0" : "1"
+      restoreLastVault: options.vaultPath ? "0" : (options.restoreLastVault === false ? "0" : "1"),
+      ...(options.vaultPath ? { vault: options.vaultPath } : {})
     }
   });
   window.once("ready-to-show", () => {
@@ -80,6 +83,10 @@ function createWindow(options = {}) {
     tektiteWindows.delete(window);
     if (mainWindow === window) mainWindow = [...tektiteWindows][0] || null;
     buildMenu();
+    if (!isQuitting) {
+      windowVaults.delete(window);
+      saveOpenSessions();
+    }
   });
 
   if (process.platform === "darwin" && app.dock) {
@@ -265,16 +272,27 @@ async function loadWorkspaceStore() {
     const parsed = JSON.parse(raw);
     return {
       lastVault: typeof parsed.lastVault === "string" ? parsed.lastVault : null,
-      workspaces: parsed.workspaces && typeof parsed.workspaces === "object" ? parsed.workspaces : {}
+      workspaces: parsed.workspaces && typeof parsed.workspaces === "object" ? parsed.workspaces : {},
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : []
     };
   } catch {
-    return { lastVault: null, workspaces: {} };
+    return { lastVault: null, workspaces: {}, sessions: [] };
   }
 }
 
 async function saveWorkspaceStore(store) {
   await fs.mkdir(path.dirname(workspaceStatePath()), { recursive: true });
   await fs.writeFile(workspaceStatePath(), JSON.stringify(store, null, 2), "utf8");
+}
+
+async function saveOpenSessions() {
+  const sessions = [...tektiteWindows]
+    .filter((w) => !w.isDestroyed())
+    .map((w) => windowVaults.get(w) || null);
+  log("saveOpenSessions", sessions);
+  const store = await loadWorkspaceStore();
+  store.sessions = sessions;
+  await saveWorkspaceStore(store);
 }
 
 function buildMenu() {
@@ -455,12 +473,32 @@ function toggleMaximize(window) {
   else window.maximize();
 }
 
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
 app.on("ready", async () => {
   app.setName("Tektite");
   await loadRecentVaults();
   buildMenu();
   createSplashWindow();
-  createWindow({ show: false });
+
+  const store = await loadWorkspaceStore();
+  const sessions = Array.isArray(store.sessions) && store.sessions.length > 0
+    ? store.sessions.filter((v) => typeof v === "string" && v)
+    : null;
+
+  if (sessions) {
+    for (const vaultPath of sessions) {
+      if (vaultPath) {
+        createWindow({ show: false, vaultPath });
+      } else {
+        createWindow({ show: false, restoreLastVault: false });
+      }
+    }
+  } else {
+    createWindow({ show: false });
+  }
 
   app.on("activate", () => {
     if (tektiteWindows.size === 0) createWindow();
@@ -510,13 +548,21 @@ ipcMain.handle("workspace:load", async (_event, rootPath = "") => {
   };
 });
 
-ipcMain.handle("workspace:save", async (_event, rootPath, workspace) => {
+ipcMain.handle("workspace:save", async (event, rootPath, workspace) => {
   if (typeof rootPath !== "string" || !rootPath) return false;
   const normalizedRoot = path.resolve(rootPath);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && tektiteWindows.has(win)) windowVaults.set(win, normalizedRoot);
   const store = await loadWorkspaceStore();
   store.lastVault = normalizedRoot;
   store.workspaces[normalizedRoot] = workspace && typeof workspace === "object" ? workspace : {};
+  store.sessions = [...tektiteWindows].filter((w) => !w.isDestroyed()).map((w) => windowVaults.get(w) || null);
   await saveWorkspaceStore(store);
+  return true;
+});
+
+ipcMain.handle("window:register", (event) => {
+  saveOpenSessions();
   return true;
 });
 
