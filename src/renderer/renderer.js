@@ -54,6 +54,11 @@ const state = {
     stack: [],
     index: -1,
     restoring: false
+  },
+  find: {
+    active: false,
+    matches: [],
+    index: -1
   }
 };
 
@@ -119,7 +124,13 @@ const els = {
   gitOutputDialog: document.getElementById("gitOutputDialog"),
   gitOutputText: document.getElementById("gitOutputText"),
   closeGitOutputButton: document.getElementById("closeGitOutputButton"),
-  closeGitOutputXButton: document.getElementById("closeGitOutputXButton")
+  closeGitOutputXButton: document.getElementById("closeGitOutputXButton"),
+  findBar: document.getElementById("findBar"),
+  findInput: document.getElementById("findInput"),
+  findCount: document.getElementById("findCount"),
+  findPrevButton: document.getElementById("findPrevButton"),
+  findNextButton: document.getElementById("findNextButton"),
+  findCloseButton: document.getElementById("findCloseButton")
 };
 
 boot();
@@ -180,6 +191,11 @@ function boot() {
       refreshVault();
       return;
     }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+      event.preventDefault();
+      openFindBar();
+      return;
+    }
     if (event.key === "Escape") closeTreeContextMenu();
     if (event.key === "Escape" && !els.nameDialog.classList.contains("hidden")) {
       closeNameDialog(null);
@@ -187,7 +203,21 @@ function boot() {
     if (event.key === "Escape" && !els.gitOutputDialog.classList.contains("hidden")) {
       closeGitOutputDialog();
     }
+    if (event.key === "Escape" && state.find.active) {
+      closeFindBar();
+    }
   });
+
+  els.findInput.addEventListener("input", updateFindMatches);
+  els.findInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      navigateFind(event.shiftKey ? -1 : 1);
+    }
+  });
+  els.findPrevButton.addEventListener("click", () => navigateFind(-1));
+  els.findNextButton.addEventListener("click", () => navigateFind(1));
+  els.findCloseButton.addEventListener("click", closeFindBar);
   globalThis.addEventListener("click", (event) => {
     if (!event.target.closest?.("#treeContextMenu")) closeTreeContextMenu();
   });
@@ -1308,6 +1338,7 @@ async function activateTab(relativePath, type, options = {}) {
     state.previewForwardHistory = [];
   }
 
+  if (state.find.active) closeFindBar();
   state.activePath = relativePath;
   state.activeType = type;
   state.selectedPath = relativePath;
@@ -1469,6 +1500,7 @@ function onEditorInput() {
   setSaveState("Unsaved");
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveActiveNote, 450);
+  if (state.find.active) updateFindMatches();
 }
 
 function resetEditorHistory(content, cursor = 0) {
@@ -1529,6 +1561,19 @@ function restoreEditorHistory(delta) {
 }
 
 function onEditorKeydown(event) {
+  if (state.find.active) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      navigateFind(event.shiftKey ? -1 : 1);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeFindBar();
+      return;
+    }
+  }
+
   const key = event.key.toLowerCase();
   if ((event.metaKey || event.ctrlKey) && key === "z") {
     event.preventDefault();
@@ -2774,6 +2819,74 @@ function stash(tokens, html) {
 
 function restore(tokens, text) {
   return text.replace(/@@TEKTITE_STASH_(\d+)@@/g, (_match, index) => tokens[Number(index)]);
+}
+
+function openFindBar() {
+  if (!state.activePath || state.activeType !== "note") return;
+  state.find.active = true;
+  els.findBar.classList.remove("hidden");
+  const sel = els.editor.value.substring(els.editor.selectionStart, els.editor.selectionEnd);
+  if (sel && !sel.includes("\n")) els.findInput.value = sel;
+  els.findInput.select();
+  els.findInput.focus();
+  updateFindMatches();
+}
+
+function closeFindBar() {
+  state.find.active = false;
+  state.find.matches = [];
+  state.find.index = -1;
+  els.findBar.classList.add("hidden");
+  els.findInput.value = "";
+  els.findCount.textContent = "";
+  els.editor.focus();
+}
+
+function updateFindMatches() {
+  const query = els.findInput.value.toLowerCase();
+  if (!query) {
+    state.find.matches = [];
+    state.find.index = -1;
+    els.findCount.textContent = "";
+    return;
+  }
+  const content = els.editor.value.toLowerCase();
+  const matches = [];
+  let pos = 0;
+  while ((pos = content.indexOf(query, pos)) !== -1) {
+    matches.push({ start: pos, end: pos + query.length });
+    pos += query.length;
+  }
+  state.find.matches = matches;
+  if (!matches.length) {
+    state.find.index = -1;
+    els.findCount.textContent = "No results";
+    return;
+  }
+  if (state.find.index < 0 || state.find.index >= matches.length) state.find.index = 0;
+  selectFindMatch(state.find.index);
+  // Return focus to input so user can keep typing
+  els.findInput.focus();
+}
+
+function navigateFind(delta) {
+  const { matches } = state.find;
+  if (!matches.length) return;
+  state.find.index = (state.find.index + delta + matches.length) % matches.length;
+  selectFindMatch(state.find.index);
+}
+
+function selectFindMatch(index) {
+  const { matches } = state.find;
+  if (index < 0 || index >= matches.length) return;
+  const match = matches[index];
+  els.findCount.textContent = `${index + 1} of ${matches.length}`;
+  const text = els.editor.value.substring(0, match.start);
+  const lines = (text.match(/\n/g) || []).length;
+  const lineHeight = 15 * 1.65;
+  els.editor.scrollTop = Math.max(0, lines * lineHeight + 26 - els.editor.clientHeight / 2);
+  els.editor.focus({ preventScroll: true });
+  els.editor.setSelectionRange(match.start, match.end);
 }
 
 function escapeHtml(value) {

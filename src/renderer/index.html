@@ -104,9 +104,18 @@
             <div class="save-state" id="saveState">Idle</div>
           </div>
           <div id="editorTabs" class="editor-tabs" role="tablist" aria-label="Open files"></div>
-          <textarea id="editor" spellcheck="true" disabled></textarea>
-          <div id="imageViewer" class="image-viewer hidden" aria-label="Image viewer">
-            <img id="imageViewerImage" alt="">
+          <div class="editor-body">
+            <textarea id="editor" spellcheck="true" disabled></textarea>
+            <div id="imageViewer" class="image-viewer hidden" aria-label="Image viewer">
+              <img id="imageViewerImage" alt="">
+            </div>
+            <div id="findBar" class="find-bar hidden" role="search" aria-label="Find in file">
+              <input id="findInput" class="find-input" type="text" placeholder="Find…" autocomplete="off" spellcheck="false" aria-label="Search term">
+              <span id="findCount" class="find-count" aria-live="polite"></span>
+              <button id="findPrevButton" type="button" class="icon-button find-nav-button" aria-label="Previous match">↑</button>
+              <button id="findNextButton" type="button" class="icon-button find-nav-button" aria-label="Next match">↓</button>
+              <button id="findCloseButton" type="button" class="icon-button" aria-label="Close find bar">×</button>
+            </div>
           </div>
           <div id="mentionMenu" class="mention-menu hidden" aria-label="Select note link"></div>
         </section>

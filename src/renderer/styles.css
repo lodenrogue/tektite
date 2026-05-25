@@ -607,6 +607,79 @@ button.tree-row {
   outline: none;
 }
 
+#editor::selection {
+  background: rgba(101, 168, 173, 0.45);
+  color: inherit;
+}
+
+:root[data-theme="light"] #editor::selection {
+  background: rgba(47, 111, 115, 0.3);
+  color: inherit;
+}
+
+.editor-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.find-bar {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+}
+
+.find-bar.hidden {
+  display: none;
+}
+
+.find-input {
+  width: 190px;
+  padding: 3px 6px;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.find-input::placeholder {
+  color: var(--muted);
+}
+
+.find-count {
+  min-width: 56px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.find-nav-button {
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 5px;
+}
+
+.find-bar .icon-button {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .editor-tabs {
   display: flex;
   min-height: 36px;
