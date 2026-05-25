@@ -130,7 +130,8 @@ const els = {
   findCount: document.getElementById("findCount"),
   findPrevButton: document.getElementById("findPrevButton"),
   findNextButton: document.getElementById("findNextButton"),
-  findCloseButton: document.getElementById("findCloseButton")
+  findCloseButton: document.getElementById("findCloseButton"),
+  editorFindOverlay: document.getElementById("editorFindOverlay")
 };
 
 boot();
@@ -208,6 +209,7 @@ function boot() {
     }
   });
 
+  els.editor.addEventListener("scroll", syncFindOverlayScroll);
   els.findInput.addEventListener("input", updateFindMatches);
   els.findInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -2825,6 +2827,7 @@ function openFindBar() {
   if (!state.activePath || state.activeType !== "note") return;
   state.find.active = true;
   els.findBar.classList.remove("hidden");
+  els.editor.classList.add("find-active");
   const sel = els.editor.value.substring(els.editor.selectionStart, els.editor.selectionEnd);
   if (sel && !sel.includes("\n")) els.findInput.value = sel;
   els.findInput.select();
@@ -2837,6 +2840,8 @@ function closeFindBar() {
   state.find.matches = [];
   state.find.index = -1;
   els.findBar.classList.add("hidden");
+  els.editor.classList.remove("find-active");
+  els.editorFindOverlay.innerHTML = "";
   els.findInput.value = "";
   els.findCount.textContent = "";
   els.editor.focus();
@@ -2848,6 +2853,7 @@ function updateFindMatches() {
     state.find.matches = [];
     state.find.index = -1;
     els.findCount.textContent = "";
+    els.editorFindOverlay.innerHTML = "";
     return;
   }
   const content = els.editor.value.toLowerCase();
@@ -2861,11 +2867,11 @@ function updateFindMatches() {
   if (!matches.length) {
     state.find.index = -1;
     els.findCount.textContent = "No results";
+    els.editorFindOverlay.innerHTML = "";
     return;
   }
   if (state.find.index < 0 || state.find.index >= matches.length) state.find.index = 0;
   selectFindMatch(state.find.index);
-  // Return focus to input so user can keep typing
   els.findInput.focus();
 }
 
@@ -2885,8 +2891,33 @@ function selectFindMatch(index) {
   const lines = (text.match(/\n/g) || []).length;
   const lineHeight = 15 * 1.65;
   els.editor.scrollTop = Math.max(0, lines * lineHeight + 26 - els.editor.clientHeight / 2);
-  els.editor.focus({ preventScroll: true });
   els.editor.setSelectionRange(match.start, match.end);
+  updateFindOverlay();
+}
+
+function updateFindOverlay() {
+  const { matches, index } = state.find;
+  const text = els.editor.value;
+  if (!matches.length) {
+    els.editorFindOverlay.innerHTML = "";
+    return;
+  }
+  let html = "";
+  let pos = 0;
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    html += escapeHtml(text.substring(pos, m.start));
+    html += `<mark${i === index ? ' class="find-current"' : ""}>${escapeHtml(text.substring(m.start, m.end))}</mark>`;
+    pos = m.end;
+  }
+  html += escapeHtml(text.substring(pos));
+  els.editorFindOverlay.innerHTML = `<pre>${html}</pre>`;
+  syncFindOverlayScroll();
+}
+
+function syncFindOverlayScroll() {
+  const pre = els.editorFindOverlay.querySelector("pre");
+  if (pre) pre.style.transform = `translateY(-${els.editor.scrollTop}px)`;
 }
 
 function escapeHtml(value) {
