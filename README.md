@@ -40,6 +40,10 @@ There is no login, cloud sync service, telemetry, remote storage, account system
 - Drag individual graph nodes to reposition them.
 - Toggle dark and light mode. Dark mode is the default.
 
+## Documentation
+
+See the [User Guide](docs/user-guide.md) for a full walkthrough of all features.
+
 ## Screenshots
 
 ![Tektite screenshot](docs/images/screenshot.png)
