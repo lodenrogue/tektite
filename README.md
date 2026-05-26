@@ -104,3 +104,9 @@ Copyright © 2026 Mathias Conradt.
 Released under the Apache License 2.0.
 
 See [NOTICE.md](NOTICE.md) for third-party notices.
+
+## Contact
+
+LinkedIn: https://www.linkedin.com/in/mathiasconradt/
+
+X: https://x.com/mathiasconradt
