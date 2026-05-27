@@ -320,6 +320,8 @@ function buildMenu() {
             submenu: [
               { label: "About Tektite", click: showAboutWindow },
               { type: "separator" },
+              { label: "Settings…", accelerator: "Cmd+,", click: () => sendToActiveWindow("menu:open-settings") },
+              { type: "separator" },
               { role: "services" },
               { type: "separator" },
               { role: "hide" },
@@ -369,6 +371,12 @@ function buildMenu() {
           label: "Close Window",
           accelerator: "Shift+CmdOrCtrl+W",
           click: () => activeTektiteWindow()?.close()
+        },
+        { type: "separator" },
+        {
+          label: "Settings…",
+          accelerator: "CmdOrCtrl+,",
+          click: () => sendToActiveWindow("menu:open-settings")
         },
         ...(isMac ? [] : [{ type: "separator" }, { role: "quit" }])
       ]
@@ -676,8 +684,8 @@ ipcMain.handle("note:write", async (_event, rootPath, relativePath, content) => 
   };
 });
 
-ipcMain.handle("note:create", async (_event, rootPath, requestedName, folder = "") => {
-  log("note:create", { requestedName, folder });
+ipcMain.handle("note:create", async (_event, rootPath, requestedName, folder = "", templatePath = "") => {
+  log("note:create", { requestedName, folder, templatePath });
   const safeName = sanitizeNoteName(requestedName || "Untitled");
   const baseFolder = normalizeRelative(folder);
   let candidate = path.posix.join(baseFolder, `${safeName}.md`);
@@ -690,8 +698,54 @@ ipcMain.handle("note:create", async (_event, rootPath, requestedName, folder = "
 
   const filePath = resolveVaultPath(rootPath, candidate);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `# ${path.basename(candidate, ".md")}\n\n`, "utf8");
+
+  let content = `# ${path.basename(candidate, ".md")}\n\n`;
+  if (templatePath) {
+    const tplFile = resolveVaultPath(rootPath, templatePath);
+    content = await fs.readFile(tplFile, "utf8");
+  }
+
+  await fs.writeFile(filePath, content, "utf8");
   return candidate;
+});
+
+const DEFAULT_TEMPLATES_PATH = ".tektite/templates";
+
+ipcMain.handle("templates:list", async (_event, rootPath, templatesPath = "") => {
+  const relPath = (templatesPath || DEFAULT_TEMPLATES_PATH).replaceAll("\\", "/").replace(/^\/+|\/+$/g, "");
+  log("templates:list", rootPath, relPath);
+  const templatesDir = path.join(rootPath, relPath);
+  assertInsideVault(rootPath, templatesDir);
+  try {
+    const entries = await fs.readdir(templatesDir, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".md"))
+      .map((e) => ({ name: path.basename(e.name, ".md"), path: `${relPath}/${e.name}` }));
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle("settings:load", async (_event, rootPath) => {
+  log("settings:load", rootPath);
+  try {
+    const settingsFile = path.join(rootPath, ".tektite", "settings.json");
+    assertInsideVault(rootPath, settingsFile);
+    const raw = await fs.readFile(settingsFile, "utf8");
+    const parsed = JSON.parse(raw);
+    return { templatesPath: typeof parsed.templatesPath === "string" ? parsed.templatesPath : "" };
+  } catch {
+    return { templatesPath: "" };
+  }
+});
+
+ipcMain.handle("settings:save", async (_event, rootPath, settings) => {
+  log("settings:save", rootPath, settings);
+  const settingsFile = path.join(rootPath, ".tektite", "settings.json");
+  assertInsideVault(rootPath, settingsFile);
+  await fs.mkdir(path.dirname(settingsFile), { recursive: true });
+  await fs.writeFile(settingsFile, JSON.stringify(settings, null, 2), "utf8");
+  return true;
 });
 
 ipcMain.handle("folder:create", async (_event, rootPath, requestedName, parentFolder = "") => {

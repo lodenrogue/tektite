@@ -23,6 +23,7 @@ There is no login, cloud sync service, telemetry, remote storage, account system
 - Click tags to filter the file tree by that tag.
 - Show or hide the Tags and Graph panes from the View menu.
 - Create new notes and folders from the file tree context menu.
+- Pre-populate new notes from templates stored in a configurable templates folder.
 - Delete files and folders from the file tree context menu.
 - Move files, folders, and images by dragging them in the file tree.
 - Automatically update Markdown image references when an image is moved.
@@ -41,6 +42,7 @@ There is no login, cloud sync service, telemetry, remote storage, account system
 - Pan the graph by dragging empty space.
 - Drag individual graph nodes to reposition them.
 - Toggle dark and light mode. Dark mode is the default.
+- Configure vault-specific settings (templates folder path) via the Settings dialog.
 
 ## Documentation
 

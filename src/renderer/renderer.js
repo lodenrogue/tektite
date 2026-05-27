@@ -59,6 +59,9 @@ const state = {
     active: false,
     matches: [],
     index: -1
+  },
+  settings: {
+    templatesPath: ""
   }
 };
 
@@ -121,6 +124,14 @@ const els = {
   confirmNameButton: document.getElementById("confirmNameButton"),
   cancelNameButton: document.getElementById("cancelNameButton"),
   cancelNameXButton: document.getElementById("cancelNameXButton"),
+  templateRow: document.getElementById("templateRow"),
+  templateSelect: document.getElementById("templateSelect"),
+  settingsButton: document.getElementById("settingsButton"),
+  settingsDialog: document.getElementById("settingsDialog"),
+  settingsForm: document.getElementById("settingsForm"),
+  templatesPathInput: document.getElementById("templatesPathInput"),
+  cancelSettingsButton: document.getElementById("cancelSettingsButton"),
+  cancelSettingsXButton: document.getElementById("cancelSettingsXButton"),
   gitOutputDialog: document.getElementById("gitOutputDialog"),
   gitOutputText: document.getElementById("gitOutputText"),
   closeGitOutputButton: document.getElementById("closeGitOutputButton"),
@@ -204,12 +215,22 @@ function boot() {
     if (event.key === "Escape" && !els.gitOutputDialog.classList.contains("hidden")) {
       closeGitOutputDialog();
     }
+    if (event.key === "Escape" && !els.settingsDialog.classList.contains("hidden")) {
+      closeSettingsDialog();
+    }
     if (event.key === "Escape" && state.find.active) {
       closeFindBar();
     }
   });
 
   els.editor.addEventListener("scroll", syncFindOverlayScroll);
+  els.settingsButton.addEventListener("click", openSettingsDialog);
+  els.settingsForm.addEventListener("submit", onSettingsSubmit);
+  els.cancelSettingsButton.addEventListener("click", closeSettingsDialog);
+  els.cancelSettingsXButton.addEventListener("click", closeSettingsDialog);
+  els.settingsDialog.addEventListener("click", (event) => {
+    if (event.target === els.settingsDialog) closeSettingsDialog();
+  });
   els.findInput.addEventListener("input", updateFindMatches);
   els.findInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -239,6 +260,7 @@ function boot() {
   globalThis.tektite.onToggleTheme(toggleTheme);
   globalThis.tektite.onToggleTagsPane(toggleTagsPane);
   globalThis.tektite.onToggleGraphPane(toggleGraphPane);
+  globalThis.tektite.onOpenSettings(openSettingsDialog);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
   applyTagsPaneVisibility();
@@ -609,6 +631,9 @@ async function openVault(rootPath) {
     state.notes = vault.notes;
     state.hasGitRepo = Boolean(vault.hasGitRepo);
     state.gitProvider = vault.gitProvider || null;
+    globalThis.tektite.loadSettings(state.rootPath)
+      .then((s) => { state.settings = s || { templatesPath: "" }; })
+      .catch(() => { state.settings = { templatesPath: "" }; });
     state.activePath = null;
     state.activeType = null;
     state.activeContent = "";
@@ -692,15 +717,17 @@ async function createNote(context = currentSelection()) {
     if (!state.rootPath) return;
   }
 
-  const requestedName = await openNameDialog({ title: "New node", defaultName: "Untitled" });
-  if (requestedName === null) {
+  const templates = await globalThis.tektite.listTemplates(state.rootPath, state.settings.templatesPath).catch(() => []);
+  const result = await openNameDialog({ title: "New node", defaultName: "Untitled", templates });
+  if (result === null) {
     log("createNote canceled");
     return;
   }
 
+  const { name: requestedName, templatePath } = result;
   const folder = folderForContext(context);
   try {
-    const newPath = await globalThis.tektite.createNote(state.rootPath, requestedName, folder);
+    const newPath = await globalThis.tektite.createNote(state.rootPath, requestedName, folder, templatePath);
     await refreshVault();
     await openNote(newPath);
     log("createNote complete", newPath);
@@ -717,12 +744,13 @@ async function createFolder(context = currentSelection()) {
     if (!state.rootPath) return;
   }
 
-  const requestedName = await openNameDialog({ title: "New folder", defaultName: "Untitled folder" });
-  if (requestedName === null) {
+  const folderResult = await openNameDialog({ title: "New folder", defaultName: "Untitled folder" });
+  if (folderResult === null) {
     log("createFolder canceled");
     return;
   }
 
+  const requestedName = folderResult.name;
   try {
     const newPath = await globalThis.tektite.createFolder(state.rootPath, requestedName, folderForContext(context));
     state.collapsedFolders.delete(parentFolder(newPath));
@@ -766,12 +794,13 @@ async function renameSelectedEntry(context = currentSelection()) {
 
   const currentName = context.path.split("/").pop() || context.path;
   const defaultName = context.type === "note" ? currentName.replace(/\.md$/i, "") : currentName;
-  const requestedName = await openNameDialog({
+  const renameResult = await openNameDialog({
     title: context.type === "folder" ? "Rename folder" : "Rename file",
     defaultName,
     confirmLabel: "Rename"
   });
-  if (requestedName === null) return;
+  if (renameResult === null) return;
+  const requestedName = renameResult.name;
 
   try {
     if (state.activePath) await saveActiveNote();
@@ -813,12 +842,30 @@ async function openMovedActiveEntry(path) {
   if (treeEntryExists(state.tree, path, "asset")) await openAsset(path);
 }
 
-function openNameDialog({ title, defaultName, confirmLabel = "Create" }) {
+function openNameDialog({ title, defaultName, confirmLabel = "Create", templates = [] }) {
   return new Promise((resolve) => {
     state.nameDialogResolve = resolve;
     els.nameDialogTitle.textContent = title;
     els.confirmNameButton.textContent = confirmLabel;
     els.nameInput.value = defaultName;
+
+    els.templateSelect.innerHTML = "";
+    if (templates.length > 0) {
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "None";
+      els.templateSelect.appendChild(blank);
+      for (const tpl of templates) {
+        const opt = document.createElement("option");
+        opt.value = tpl.path;
+        opt.textContent = tpl.name;
+        els.templateSelect.appendChild(opt);
+      }
+      els.templateRow.classList.remove("hidden");
+    } else {
+      els.templateRow.classList.add("hidden");
+    }
+
     els.nameDialog.setAttribute("open", "");
     els.nameDialog.classList.remove("hidden");
     requestAnimationFrame(() => {
@@ -831,13 +878,15 @@ function openNameDialog({ title, defaultName, confirmLabel = "Create" }) {
 function onNameSubmit(event) {
   event.preventDefault();
   const name = els.nameInput.value.trim();
-  closeNameDialog(name || "Untitled");
+  const templatePath = els.templateRow.classList.contains("hidden") ? "" : els.templateSelect.value;
+  closeNameDialog({ name: name || "Untitled", templatePath });
 }
 
 function closeNameDialog(value) {
   if (!state.nameDialogResolve) return;
   els.nameDialog.classList.add("hidden");
   els.nameDialog.removeAttribute("open");
+  els.templateRow.classList.add("hidden");
   const resolve = state.nameDialogResolve;
   state.nameDialogResolve = null;
   resolve(value);
@@ -949,15 +998,15 @@ async function createMentionNode() {
   const rangeEnd = els.editor.selectionStart;
   const defaultName = mentionDefaultName();
   closeMentionMenu();
-  const requestedName = await openNameDialog({
+  const mentionResult = await openNameDialog({
     title: "New node",
     defaultName
   });
-  if (requestedName === null) {
+  if (mentionResult === null) {
     els.editor.focus();
     return;
   }
-
+  const requestedName = mentionResult.name;
   try {
     const newPath = await globalThis.tektite.createNote(state.rootPath, requestedName, parentFolder(sourcePath));
     await refreshVault();
@@ -1716,6 +1765,28 @@ function clearGitOutputSubscription() {
 function closeGitOutputDialog() {
   els.gitOutputDialog.classList.add("hidden");
   els.gitOutputDialog.removeAttribute("open");
+}
+
+function openSettingsDialog() {
+  els.templatesPathInput.value = state.settings.templatesPath || "";
+  els.settingsDialog.setAttribute("open", "");
+  els.settingsDialog.classList.remove("hidden");
+  requestAnimationFrame(() => els.templatesPathInput.focus());
+}
+
+function closeSettingsDialog() {
+  els.settingsDialog.classList.add("hidden");
+  els.settingsDialog.removeAttribute("open");
+}
+
+async function onSettingsSubmit(event) {
+  event.preventDefault();
+  const templatesPath = els.templatesPathInput.value.trim();
+  state.settings = { templatesPath };
+  if (state.rootPath) {
+    await globalThis.tektite.saveSettings(state.rootPath, state.settings).catch(() => {});
+  }
+  closeSettingsDialog();
 }
 
 async function restoreWorkspaceState() {
