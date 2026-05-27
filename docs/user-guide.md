@@ -14,8 +14,10 @@ Tektite is a lightweight Markdown knowledge base for macOS and Linux. It works e
 6. [Tags Pane](#tags-pane)
 7. [Graph Pane](#graph-pane)
 8. [Git Sync](#git-sync)
-9. [Layout & Appearance](#layout--appearance)
-10. [Keyboard Shortcuts](#keyboard-shortcuts)
+9. [Templates](#templates)
+10. [Settings](#settings)
+11. [Layout & Appearance](#layout--appearance)
+12. [Keyboard Shortcuts](#keyboard-shortcuts)
 
 ---
 
@@ -222,7 +224,61 @@ Tektite does not provide a full Git interface. For anything beyond the one-click
 
 ---
 
-## Layout & Appearance
+## Templates
+
+Templates let you pre-populate new notes with reusable content — useful for meeting notes, daily journals, project briefs, or any note type you create repeatedly.
+
+### Setting up templates
+
+Create a folder inside your vault to hold template files. By default Tektite looks for `.tektite/templates` (relative to the vault root). You can change this path in [Settings](#settings).
+
+Add one `.md` file per template to that folder. The file name becomes the template name shown in the New Note dialog. Example:
+
+```
+my-vault/
+  .tektite/
+    templates/
+      Meeting Notes.md
+      Daily Journal.md
+      Project Brief.md
+```
+
+### Using a template
+
+1. Create a new note via the context menu, **File › New Node**, or `Cmd+Shift+N`.
+2. The **New Note** dialog shows a **Template** dropdown if at least one template file exists in the configured folder.
+3. Choose a template or leave it at **None** for a blank note.
+4. Enter the note name and click **Create**.
+
+The new note is pre-populated with the full content of the chosen template file.
+
+### Tips
+
+- Templates are plain Markdown files — edit them in Tektite like any other note.
+- The `.tektite/` folder is hidden in the file tree (dot-prefix convention) so templates don't clutter your vault view.
+- If no templates folder exists or it is empty, the dropdown does not appear in the dialog.
+
+---
+
+## Settings
+
+Open Settings via:
+
+- The **cog icon** (⚙) in the sidebar toolbar
+- **File › Settings…** (`Cmd+,`)
+- **Tektite › Settings…** (`Cmd+,`) on macOS
+
+### Templates folder
+
+The path to the folder containing template files, relative to the vault root. Default: `.tektite/templates`.
+
+Leave blank to use the default. Any valid relative path works — for example `_templates` or `docs/templates`.
+
+Settings are saved per vault in `.tektite/settings.json` inside the vault root. This file is hidden from the file tree and can be committed to Git alongside the vault if you want to share settings across machines.
+
+---
+
+
 
 ### Resizing panes
 
@@ -254,4 +310,5 @@ Use **File › New Window** (`Cmd+N`) to open a second window. Each window is in
 | Refresh Vault | `Cmd+R` |
 | Undo | `Cmd+Z` |
 | Redo | `Cmd+Shift+Z` |
+| Open Settings | `Cmd+,` |
 | Dismiss dialogs | `Esc` |

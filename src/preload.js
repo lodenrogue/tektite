@@ -6,8 +6,11 @@ contextBridge.exposeInMainWorld("tektite", {
   readNote: (rootPath, relativePath) => ipcRenderer.invoke("note:read", rootPath, relativePath),
   writeNote: (rootPath, relativePath, content) =>
     ipcRenderer.invoke("note:write", rootPath, relativePath, content),
-  createNote: (rootPath, requestedName, folder) =>
-    ipcRenderer.invoke("note:create", rootPath, requestedName, folder),
+  createNote: (rootPath, requestedName, folder, templatePath) =>
+    ipcRenderer.invoke("note:create", rootPath, requestedName, folder, templatePath),
+  listTemplates: (rootPath, templatesPath) => ipcRenderer.invoke("templates:list", rootPath, templatesPath),
+  loadSettings: (rootPath) => ipcRenderer.invoke("settings:load", rootPath),
+  saveSettings: (rootPath, settings) => ipcRenderer.invoke("settings:save", rootPath, settings),
   createFolder: (rootPath, requestedName, parentFolder) =>
     ipcRenderer.invoke("folder:create", rootPath, requestedName, parentFolder),
   deleteEntry: (rootPath, relativePath, type) =>
@@ -37,6 +40,7 @@ contextBridge.exposeInMainWorld("tektite", {
   onToggleTheme: (callback) => ipcRenderer.on("menu:toggle-theme", callback),
   onToggleTagsPane: (callback) => ipcRenderer.on("menu:toggle-tags-pane", callback),
   onToggleGraphPane: (callback) => ipcRenderer.on("menu:toggle-graph-pane", callback),
+  onOpenSettings: (callback) => ipcRenderer.on("menu:open-settings", callback),
   onGitSyncOutput: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on("git:sync-output", listener);
