@@ -228,19 +228,7 @@ function boot() {
       openFindBar();
       return;
     }
-    if (event.key === "Escape") closeTreeContextMenu();
-    if (event.key === "Escape" && !els.nameDialog.classList.contains("hidden")) {
-      closeNameDialog(null);
-    }
-    if (event.key === "Escape" && !els.gitOutputDialog.classList.contains("hidden")) {
-      closeGitOutputDialog();
-    }
-    if (event.key === "Escape" && !els.settingsDialog.classList.contains("hidden")) {
-      closeSettingsDialog();
-    }
-    if (event.key === "Escape" && state.find.active) {
-      closeFindBar();
-    }
+    if (event.key === "Escape") onGlobalEscape();
   });
 
   els.editor.addEventListener("scroll", syncFindOverlayScroll);
@@ -394,10 +382,10 @@ function applyLayout() {
   const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
   if (!state.showEditorPane && !state.showPreviewPane) {
     els.workspace.style.gridTemplateColumns = `0 0 0`;
-  } else if (!state.showEditorPane) {
-    els.workspace.style.gridTemplateColumns = `0 0 minmax(0, 1fr)`;
-  } else if (!state.showPreviewPane) {
+  } else if (state.showEditorPane && !state.showPreviewPane) {
     els.workspace.style.gridTemplateColumns = `minmax(0, 1fr) 0 0`;
+  } else if (state.showPreviewPane && !state.showEditorPane) {
+    els.workspace.style.gridTemplateColumns = `0 0 minmax(0, 1fr)`;
   } else {
     els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
   }
@@ -1895,6 +1883,14 @@ function clearGitOutputSubscription() {
   state.gitOutputUnsubscribe = null;
 }
 
+function onGlobalEscape() {
+  closeTreeContextMenu();
+  if (!els.nameDialog.classList.contains("hidden")) closeNameDialog(null);
+  if (!els.gitOutputDialog.classList.contains("hidden")) closeGitOutputDialog();
+  if (!els.settingsDialog.classList.contains("hidden")) closeSettingsDialog();
+  if (state.find.active) closeFindBar();
+}
+
 function closeGitOutputDialog() {
   els.gitOutputDialog.classList.add("hidden");
   els.gitOutputDialog.removeAttribute("open");
@@ -2249,7 +2245,8 @@ function openTreeContextMenu(x, y, context) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `context-menu-item${item.danger ? " danger" : ""}`;
-    button.innerHTML = `<span>${escapeHtml(item.label)}</span>${item.shortcut ? `<span class="context-menu-shortcut">${escapeHtml(item.shortcut)}</span>` : ""}`;
+    const shortcutHtml = item.shortcut ? `<span class="context-menu-shortcut">${escapeHtml(item.shortcut)}</span>` : "";
+    button.innerHTML = `<span>${escapeHtml(item.label)}</span>${shortcutHtml}`;
     button.addEventListener("click", () => {
       closeTreeContextMenu();
       item.action();
@@ -2273,20 +2270,7 @@ function getVisibleTreeRows() {
   );
 }
 
-function onTreeKeydown(event) {
-  if (event.key === "Tab" && !event.shiftKey) {
-    event.preventDefault();
-    els.editor.focus();
-    return;
-  }
-
-  const rows = getVisibleTreeRows();
-  if (!rows.length) return;
-
-  const currentIdx = rows.findIndex(
-    (el) => el.dataset.path === state.selectedPath
-  );
-
+function onTreeNavKeydown(event, rows, currentIdx) {
   if (event.key === "ArrowDown") {
     event.preventDefault();
     const next = rows[currentIdx + 1] || rows[0];
@@ -2294,7 +2278,7 @@ function onTreeKeydown(event) {
     next.scrollIntoView({ block: "nearest" });
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
-    const prev = rows[currentIdx - 1] || rows[rows.length - 1];
+    const prev = rows[currentIdx - 1] || rows.at(-1);
     activateTreeRow(prev.dataset.path, prev.dataset.type || "folder");
     prev.scrollIntoView({ block: "nearest" });
   } else if (event.key === "ArrowRight") {
@@ -2310,16 +2294,34 @@ function onTreeKeydown(event) {
   } else if (event.key === "Enter") {
     event.preventDefault();
     activateTreeRow(state.selectedPath, state.selectedType, { toggle: true });
-  } else if ((event.metaKey || event.ctrlKey) && event.key === "Backspace") {
+  }
+}
+
+function onTreeKeydown(event) {
+  if (event.key === "Tab" && !event.shiftKey) {
+    event.preventDefault();
+    els.editor.focus();
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.key === "Backspace") {
     event.preventDefault();
     if (state.selectedPath) deleteSelectedEntry(currentSelection());
-  } else if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyF") {
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyF") {
     event.preventDefault();
     createFolder(currentSelection());
-  } else if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyR") {
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyR") {
     event.preventDefault();
     if (state.selectedPath) renameSelectedEntry(currentSelection());
+    return;
   }
+  const rows = getVisibleTreeRows();
+  if (!rows.length) return;
+  const currentIdx = rows.findIndex((el) => el.dataset.path === state.selectedPath);
+  onTreeNavKeydown(event, rows, currentIdx);
 }
 
 function activateTreeRow(path, type, { toggle = false } = {}) {
