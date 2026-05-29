@@ -48,6 +48,8 @@ There is no login, cloud sync service, telemetry, remote storage, account system
 
 See the [User Guide](docs/user-guide.md) for a full walkthrough of all features.
 
+See the [Changelog](CHANGELOG.md) for release history.
+
 ## Screenshots
 
 ![Tektite screenshot](docs/images/screenshot.png)
