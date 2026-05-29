@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.30] - 2026-05-29
+
+- Formatting bar: Link and Image buttons insert markdown link/image syntax
+- Selected URL text is automatically wrapped with filename as label; non-URL selection or no selection inserts placeholder
+
 ## [0.1.29] - 2026-05-29
 
 - Expand All / Collapse All context menu actions on vault root and folder items

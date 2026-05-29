@@ -145,6 +145,8 @@ const els = {
   fmtH4: document.getElementById("fmtH4"),
   fmtSeparator: document.getElementById("fmtSeparator"),
   fmtList: document.getElementById("fmtList"),
+  fmtLink: document.getElementById("fmtLink"),
+  fmtImage: document.getElementById("fmtImage"),
   findBar: document.getElementById("findBar"),
   findInput: document.getElementById("findInput"),
   findCount: document.getElementById("findCount"),
@@ -247,6 +249,8 @@ function boot() {
   els.fmtH4.addEventListener("click", () => toggleHeading(4));
   els.fmtSeparator.addEventListener("click", insertSeparator);
   els.fmtList.addEventListener("click", toggleListOnLines);
+  els.fmtLink.addEventListener("click", () => insertMarkdownLink(false));
+  els.fmtImage.addEventListener("click", () => insertMarkdownLink(true));
   els.editor.addEventListener("scroll", syncFindOverlayScroll);
   els.settingsButton.addEventListener("click", openSettingsDialog);
   els.settingsForm.addEventListener("submit", onSettingsSubmit);
@@ -1763,6 +1767,36 @@ function insertSeparator() {
   const pos = atLineStart ? lineStart : start;
   els.editor.value = value.substring(0, pos) + insert + value.substring(pos);
   els.editor.selectionStart = els.editor.selectionEnd = pos + insert.length;
+  onEditorInput();
+}
+
+function urlFilename(url) {
+  const segment = url.replace(/[?#].*$/, "").split("/").findLast(Boolean) || "link";
+  return segment.replace(/\.[^.]+$/, "") || "link";
+}
+
+function looksLikeUrl(text) {
+  if (/\s/.test(text)) return false;
+  return /^https?:\/\//i.test(text) ||
+    text.startsWith("//") ||
+    /^\.{0,2}\//.test(text) ||
+    /^[a-zA-Z0-9][a-zA-Z0-9._\-/]*\.[a-zA-Z]{2,}(\/.*)?$/.test(text);
+}
+
+function insertMarkdownLink(isImage) {
+  const value = els.editor.value;
+  const start = els.editor.selectionStart;
+  const end = els.editor.selectionEnd;
+  const selected = value.substring(start, end);
+  let snippet;
+  if (selected && looksLikeUrl(selected)) {
+    const label = urlFilename(selected);
+    snippet = isImage ? `![${label}](${selected})` : `[${label}](${selected})`;
+  } else {
+    snippet = isImage ? "![Image](url)" : "[Link text](url)";
+  }
+  els.editor.value = value.substring(0, start) + snippet + value.substring(end);
+  els.editor.selectionStart = els.editor.selectionEnd = start + snippet.length;
   onEditorInput();
 }
 
