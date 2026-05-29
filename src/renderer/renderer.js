@@ -1644,31 +1644,54 @@ function onFindBarKeydown(event) {
   return false;
 }
 
+function toggleListOnLines() {
+  const value = els.editor.value;
+  const start = els.editor.selectionStart;
+  const end = els.editor.selectionEnd;
+  const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+  const lineEnd = value.indexOf("\n", end === start ? end : end - 1);
+  const blockEnd = lineEnd === -1 ? value.length : lineEnd;
+  const lines = value.substring(lineStart, blockEnd).split("\n");
+  const allList = lines.every((l) => l.trim() === "" || l.startsWith("- "));
+  const toggled = allList
+    ? lines.map((l) => l.startsWith("- ") ? l.slice(2) : l).join("\n")
+    : lines.map((l) => l.trim() === "" ? l : `- ${l}`).join("\n");
+  els.editor.value = value.substring(0, lineStart) + toggled + value.substring(blockEnd);
+  els.editor.selectionStart = lineStart;
+  els.editor.selectionEnd = lineStart + toggled.length;
+  onEditorInput();
+}
+
+function indentSelectedLines() {
+  const start = els.editor.selectionStart;
+  const end = els.editor.selectionEnd;
+  const value = els.editor.value;
+  if (value.substring(start, end).includes("\n")) {
+    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+    const block = value.substring(lineStart, end);
+    const indented = block.replace(/^/gm, "\t");
+    els.editor.value = value.substring(0, lineStart) + indented + value.substring(end);
+    els.editor.selectionStart = lineStart;
+    els.editor.selectionEnd = lineStart + indented.length;
+  } else {
+    els.editor.value = value.substring(0, start) + "\t" + value.substring(end);
+    els.editor.selectionStart = els.editor.selectionEnd = start + 1;
+  }
+  onEditorInput();
+}
+
 function onEditorKeydown(event) {
   if (onFindBarKeydown(event)) return;
 
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "Digit8") {
+    event.preventDefault();
+    toggleListOnLines();
+    return;
+  }
+
   if (event.key === "Tab" && !event.metaKey && !event.ctrlKey && !state.mention.active) {
     event.preventDefault();
-    const start = els.editor.selectionStart;
-    const end = els.editor.selectionEnd;
-    const value = els.editor.value;
-    const selected = value.substring(start, end);
-
-    if (selected.includes("\n")) {
-      // Multi-line: indent every line in selection
-      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-      const block = value.substring(lineStart, end);
-      const indented = block.replace(/^/gm, "\t");
-      els.editor.value = value.substring(0, lineStart) + indented + value.substring(end);
-      els.editor.selectionStart = lineStart;
-      els.editor.selectionEnd = lineStart + indented.length;
-    } else {
-      // Single cursor / single-line selection: insert tab at cursor
-      els.editor.value = value.substring(0, start) + "\t" + value.substring(end);
-      els.editor.selectionStart = els.editor.selectionEnd = start + 1;
-    }
-
-    onEditorInput();
+    indentSelectedLines();
     return;
   }
 
@@ -1684,8 +1707,10 @@ function onEditorKeydown(event) {
     return;
   }
 
-  if (!state.mention.active) return;
+  if (state.mention.active) onMentionMenuKeydown(event);
+}
 
+function onMentionMenuKeydown(event) {
   if (event.key === "ArrowDown") {
     event.preventDefault();
     state.mention.selectedIndex = Math.min(state.mention.selectedIndex + 1, state.mention.items.length);
