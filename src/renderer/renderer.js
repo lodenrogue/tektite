@@ -803,17 +803,22 @@ async function renameSelectedEntry(context = currentSelection()) {
   const requestedName = renameResult.name;
 
   try {
-    if (state.activePath) await saveActiveNote();
     clearTimeout(state.saveTimer);
+    if (state.activePath) await saveActiveNote();
     const newPath = await globalThis.tektite.renameEntry(state.rootPath, context.path, context.type, requestedName);
     const previousActivePath = state.activePath;
-    await refreshVault();
+    await refreshVault({ flush: false });
 
     await reopenRenamedEntry(context, previousActivePath, newPath);
     setSaveState("Renamed");
   } catch (error) {
     console.error("[tektite:renderer] renameSelectedEntry failed", error);
     setSaveState("Failed");
+    const msg = error.message || "";
+    const friendlyError = msg.includes("already exists")
+      ? `Could not rename "${requestedName}.md": a file with that name already exists.`
+      : `Could not rename file.`;
+    globalThis.alert(friendlyError);
   }
 }
 
