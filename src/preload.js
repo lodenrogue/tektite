@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("tektite", {
   onOpenRecentVault: (callback) =>
     ipcRenderer.on("menu:open-recent-vault", (_event, rootPath) => callback(rootPath)),
   onNewNote: (callback) => ipcRenderer.on("menu:new-note", callback),
+  onNewFolder: (callback) => ipcRenderer.on("menu:new-folder", callback),
   onCloseTab: (callback) => ipcRenderer.on("menu:close-tab", callback),
   onCloseAllTabs: (callback) => ipcRenderer.on("menu:close-all-tabs", callback),
   onRefreshVault: (callback) => ipcRenderer.on("menu:refresh-vault", callback),

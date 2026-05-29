@@ -178,6 +178,12 @@ function boot() {
   els.fileTree.addEventListener("drop", onTreeDrop);
   els.fileTree.addEventListener("contextmenu", onTreeContextMenu);
   els.fileTree.addEventListener("click", closeTreeContextMenu);
+  els.fileTree.addEventListener("mousedown", (event) => {
+    if (event.target.closest(".tree-row, .tree-caret-button, .tree-label-button")) {
+      event.preventDefault();
+    }
+  });
+  els.fileTree.addEventListener("keydown", onTreeKeydown);
   els.preview.addEventListener("click", onPreviewClick);
   els.previewBackButton.addEventListener("click", goBackPreviewHistory);
   els.previewForwardButton.addEventListener("click", goForwardPreviewHistory);
@@ -202,12 +208,22 @@ function boot() {
     if (event.target === els.gitOutputDialog) closeGitOutputDialog();
   });
   globalThis.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
+    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "r") {
       event.preventDefault();
       refreshVault();
       return;
     }
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyF") {
+      event.preventDefault();
+      createFolder();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyR") {
+      event.preventDefault();
+      if (state.selectedPath) renameSelectedEntry();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f" && !event.shiftKey) {
       event.preventDefault();
       openFindBar();
       return;
@@ -256,7 +272,8 @@ function boot() {
 
   globalThis.tektite.onOpenVault(chooseVault);
   globalThis.tektite.onOpenRecentVault(openVault);
-  globalThis.tektite.onNewNote(createNote);
+  globalThis.tektite.onNewNote(() => createNote());
+  globalThis.tektite.onNewFolder(() => createFolder());
   globalThis.tektite.onCloseTab(closeActiveEditorTab);
   globalThis.tektite.onCloseAllTabs(closeAllEditorTabs);
   globalThis.tektite.onRefreshVault(refreshVault);
@@ -811,6 +828,8 @@ async function createFolder(context = currentSelection()) {
     const newPath = await globalThis.tektite.createFolder(state.rootPath, requestedName, folderForContext(context));
     state.collapsedFolders.delete(parentFolder(newPath));
     await refreshVault();
+    selectEntry(newPath, "folder");
+    els.fileTree.focus();
     log("createFolder complete", newPath);
   } catch (error) {
     console.error("[tektite:renderer] createFolder failed", error);
@@ -839,6 +858,7 @@ async function deleteSelectedEntry(context = currentSelection()) {
     state.selectedType = "folder";
     await refreshVault();
     setSaveState("Deleted");
+    els.fileTree.focus();
   } catch (error) {
     console.error("[tektite:renderer] deleteSelectedEntry failed", error);
     setSaveState("Failed");
@@ -880,18 +900,22 @@ async function renameSelectedEntry(context = currentSelection()) {
 
 async function reopenRenamedEntry(context, previousActivePath, newPath) {
   if (context.type === "note" && previousActivePath === context.path) {
-    await openNote(newPath);
+    await openNote(newPath, { focusEditor: false });
+    els.fileTree.focus();
     return;
   }
   if (context.type === "asset" && previousActivePath === context.path) {
-    await openAsset(newPath);
+    await openAsset(newPath, { focusEditor: false });
+    els.fileTree.focus();
     return;
   }
   if (context.type === "folder" && isPathInside(previousActivePath, context.path)) {
     await openMovedActiveEntry(pathAfterMove(previousActivePath, context.path, newPath));
+    els.fileTree.focus();
     return;
   }
   if (context.type !== "folder") selectEntry(newPath, context.type);
+  els.fileTree.focus();
 }
 
 async function openMovedActiveEntry(path) {
@@ -929,10 +953,8 @@ function openNameDialog({ title, defaultName, confirmLabel = "Create", templates
 
     els.nameDialog.setAttribute("open", "");
     els.nameDialog.classList.remove("hidden");
-    requestAnimationFrame(() => {
-      els.nameInput.focus();
-      els.nameInput.select();
-    });
+    els.nameInput.focus();
+    els.nameInput.select();
   });
 }
 
@@ -1487,7 +1509,7 @@ async function activateTab(relativePath, type, options = {}) {
     els.editor.setSelectionRange(Math.min(cursor, content.length), Math.min(cursor, content.length));
     resetEditorHistory(content, Math.min(cursor, content.length));
     renderPreview(content);
-    els.editor.focus();
+    if (options.focusEditor !== false) els.editor.focus();
   } else {
     state.activeContent = "";
     els.editor.disabled = true;
@@ -2065,8 +2087,9 @@ function renderTreeLeafNode(node, query) {
   button.dataset.type = node.type;
   button.innerHTML = `${treeIconSvg(node.type)}<span class="tree-label">${escapeHtml(label)}</span>`;
   button.addEventListener("click", () => {
-    if (node.type === "note") openNote(node.path);
-    else openAsset(node.path);
+    if (node.type === "note") openNote(node.path, { focusEditor: false });
+    else openAsset(node.path, { focusEditor: false });
+    els.fileTree.focus();
   });
   return button;
 }
@@ -2139,7 +2162,7 @@ function renderTreeFolderNode(node, query) {
 
   const wrap = document.createElement("div");
   const header = document.createElement("div");
-  header.className = "tree-row";
+  header.className = `tree-row${isSelected(node.path, "folder") ? " selected" : ""}`;
   header.setAttribute("aria-expanded", String(!isCollapsed));
   header.draggable = Boolean(node.path);
   header.dataset.path = node.path;
@@ -2150,13 +2173,13 @@ function renderTreeFolderNode(node, query) {
   toggle.type = "button";
   toggle.setAttribute("aria-label", isCollapsed ? "Expand folder" : "Collapse folder");
   toggle.innerHTML = `<span class="tree-caret" aria-hidden="true">${isCollapsed ? "▸" : "▾"}</span>`;
-  toggle.addEventListener("click", () => toggleFolder(node.path));
+  toggle.addEventListener("click", () => { toggleFolder(node.path); els.fileTree.focus(); });
 
   const label = document.createElement("button");
   label.className = "tree-label-button";
   label.type = "button";
   label.innerHTML = `${treeIconSvg("folder")}<span class="tree-label">${escapeHtml(node.name)}</span>`;
-  label.addEventListener("click", () => toggleFolder(node.path));
+  label.addEventListener("click", () => { selectEntry(node.path, "folder"); toggleFolder(node.path); els.fileTree.focus(); });
 
   header.append(toggle, label);
   const children = document.createElement("div");
@@ -2187,10 +2210,12 @@ function openTreeContextMenu(x, y, context) {
   const items = [
     {
       label: "New node",
+      shortcut: "⇧⌘N",
       action: () => createNote(context)
     },
     {
       label: "New folder",
+      shortcut: "⇧⌘F",
       action: () => createFolder(context)
     }
   ];
@@ -2200,10 +2225,12 @@ function openTreeContextMenu(x, y, context) {
       { type: "separator" },
       {
         label: context.type === "folder" ? "Rename folder" : "Rename file",
+        shortcut: "⇧⌘R",
         action: () => renameSelectedEntry(context)
       },
       {
         label: context.type === "folder" ? "Delete folder" : "Delete file",
+        shortcut: "⌘⌫",
         danger: true,
         action: () => deleteSelectedEntry(context)
       }
@@ -2222,7 +2249,7 @@ function openTreeContextMenu(x, y, context) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `context-menu-item${item.danger ? " danger" : ""}`;
-    button.textContent = item.label;
+    button.innerHTML = `<span>${escapeHtml(item.label)}</span>${item.shortcut ? `<span class="context-menu-shortcut">${escapeHtml(item.shortcut)}</span>` : ""}`;
     button.addEventListener("click", () => {
       closeTreeContextMenu();
       item.action();
@@ -2238,6 +2265,70 @@ function openTreeContextMenu(x, y, context) {
 
 function closeTreeContextMenu() {
   els.treeContextMenu.classList.add("hidden");
+}
+
+function getVisibleTreeRows() {
+  return Array.from(els.fileTree.querySelectorAll(".tree-row")).filter(
+    (el) => !el.closest(".tree-children[hidden]")
+  );
+}
+
+function onTreeKeydown(event) {
+  if (event.key === "Tab" && !event.shiftKey) {
+    event.preventDefault();
+    els.editor.focus();
+    return;
+  }
+
+  const rows = getVisibleTreeRows();
+  if (!rows.length) return;
+
+  const currentIdx = rows.findIndex(
+    (el) => el.dataset.path === state.selectedPath
+  );
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    const next = rows[currentIdx + 1] || rows[0];
+    activateTreeRow(next.dataset.path, next.dataset.type || "folder");
+    next.scrollIntoView({ block: "nearest" });
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    const prev = rows[currentIdx - 1] || rows[rows.length - 1];
+    activateTreeRow(prev.dataset.path, prev.dataset.type || "folder");
+    prev.scrollIntoView({ block: "nearest" });
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    if (state.selectedType === "folder" && state.collapsedFolders.has(state.selectedPath)) {
+      toggleFolder(state.selectedPath);
+    }
+  } else if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    if (state.selectedType === "folder" && !state.collapsedFolders.has(state.selectedPath)) {
+      toggleFolder(state.selectedPath);
+    }
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    activateTreeRow(state.selectedPath, state.selectedType, { toggle: true });
+  } else if ((event.metaKey || event.ctrlKey) && event.key === "Backspace") {
+    event.preventDefault();
+    if (state.selectedPath) deleteSelectedEntry(currentSelection());
+  } else if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyF") {
+    event.preventDefault();
+    createFolder(currentSelection());
+  } else if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "KeyR") {
+    event.preventDefault();
+    if (state.selectedPath) renameSelectedEntry(currentSelection());
+  }
+}
+
+function activateTreeRow(path, type, { toggle = false } = {}) {
+  if (type === "note") openNote(path, { focusEditor: false });
+  else if (type === "asset") openAsset(path, { focusEditor: false });
+  else {
+    selectEntry(path, type);
+    if (toggle) toggleFolder(path);
+  }
 }
 
 function toggleFolder(folderPath) {

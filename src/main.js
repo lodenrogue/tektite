@@ -359,6 +359,11 @@ function buildMenu() {
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => sendToActiveWindow("menu:new-note")
         },
+        {
+          label: "New Folder",
+          accelerator: "CmdOrCtrl+Shift+F",
+          click: () => sendToActiveWindow("menu:new-folder")
+        },
         { type: "separator" },
         {
           label: "Close Tab",

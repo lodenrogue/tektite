@@ -1121,7 +1121,10 @@ button.tree-row {
 }
 
 .context-menu-item {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   width: 100%;
   min-height: 30px;
   border-radius: 6px;
@@ -1129,6 +1132,13 @@ button.tree-row {
   color: var(--ink);
   padding: 0 10px;
   text-align: left;
+}
+
+.context-menu-shortcut {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .context-menu-item:hover {
