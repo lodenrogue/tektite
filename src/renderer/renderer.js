@@ -1642,6 +1642,31 @@ function onFindBarKeydown(event) {
 function onEditorKeydown(event) {
   if (onFindBarKeydown(event)) return;
 
+  if (event.key === "Tab" && !event.metaKey && !event.ctrlKey && !state.mention.active) {
+    event.preventDefault();
+    const start = els.editor.selectionStart;
+    const end = els.editor.selectionEnd;
+    const value = els.editor.value;
+    const selected = value.substring(start, end);
+
+    if (selected.includes("\n")) {
+      // Multi-line: indent every line in selection
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const block = value.substring(lineStart, end);
+      const indented = block.replace(/^/gm, "\t");
+      els.editor.value = value.substring(0, lineStart) + indented + value.substring(end);
+      els.editor.selectionStart = lineStart;
+      els.editor.selectionEnd = lineStart + indented.length;
+    } else {
+      // Single cursor / single-line selection: insert tab at cursor
+      els.editor.value = value.substring(0, start) + "\t" + value.substring(end);
+      els.editor.selectionStart = els.editor.selectionEnd = start + 1;
+    }
+
+    onEditorInput();
+    return;
+  }
+
   const key = event.key.toLowerCase();
   if ((event.metaKey || event.ctrlKey) && key === "z") {
     event.preventDefault();
