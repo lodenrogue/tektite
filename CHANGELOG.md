@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.27] - 2026-05-29
+
+- Formatting toolbar in editor pane with H1–H4 heading toggles, horizontal rule insert, and list toggle
+- Formatting buttons preserve editor selection (no focus steal on click)
+
 ## [0.1.25] - 2026-05-29
 
 - Keyboard navigation in file tree: ↑/↓ navigate, →/← expand/collapse folders, Enter opens item, Tab moves to editor
