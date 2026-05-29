@@ -110,6 +110,19 @@
             <div class="save-state" id="saveState">Idle</div>
           </div>
           <div id="editorTabs" class="editor-tabs" role="tablist" aria-label="Open files"></div>
+          <div id="formattingBar" class="formatting-bar hidden" role="toolbar" aria-label="Formatting">
+            <button type="button" class="fmt-button" id="fmtH1" data-tooltip="Heading 1" aria-label="Heading 1">H1</button>
+            <button type="button" class="fmt-button" id="fmtH2" data-tooltip="Heading 2" aria-label="Heading 2">H2</button>
+            <button type="button" class="fmt-button" id="fmtH3" data-tooltip="Heading 3" aria-label="Heading 3">H3</button>
+            <button type="button" class="fmt-button" id="fmtH4" data-tooltip="Heading 4" aria-label="Heading 4">H4</button>
+            <div class="fmt-divider" aria-hidden="true"></div>
+            <button type="button" class="fmt-button" id="fmtSeparator" data-tooltip="Horizontal rule" aria-label="Horizontal rule">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+            </button>
+            <button type="button" class="fmt-button" id="fmtList" data-tooltip="Toggle list (⇧⌘8)" aria-label="Toggle list">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg>
+            </button>
+          </div>
           <div class="editor-body">
             <div id="editorFindOverlay" class="editor-find-overlay" aria-hidden="true"></div>
             <textarea id="editor" spellcheck="true" disabled></textarea>

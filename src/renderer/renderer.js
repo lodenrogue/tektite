@@ -138,6 +138,13 @@ const els = {
   gitOutputText: document.getElementById("gitOutputText"),
   closeGitOutputButton: document.getElementById("closeGitOutputButton"),
   closeGitOutputXButton: document.getElementById("closeGitOutputXButton"),
+  formattingBar: document.getElementById("formattingBar"),
+  fmtH1: document.getElementById("fmtH1"),
+  fmtH2: document.getElementById("fmtH2"),
+  fmtH3: document.getElementById("fmtH3"),
+  fmtH4: document.getElementById("fmtH4"),
+  fmtSeparator: document.getElementById("fmtSeparator"),
+  fmtList: document.getElementById("fmtList"),
   findBar: document.getElementById("findBar"),
   findInput: document.getElementById("findInput"),
   findCount: document.getElementById("findCount"),
@@ -231,6 +238,15 @@ function boot() {
     if (event.key === "Escape") onGlobalEscape();
   });
 
+  els.formattingBar.addEventListener("mousedown", (event) => {
+    if (event.target.closest(".fmt-button")) event.preventDefault();
+  });
+  els.fmtH1.addEventListener("click", () => toggleHeading(1));
+  els.fmtH2.addEventListener("click", () => toggleHeading(2));
+  els.fmtH3.addEventListener("click", () => toggleHeading(3));
+  els.fmtH4.addEventListener("click", () => toggleHeading(4));
+  els.fmtSeparator.addEventListener("click", insertSeparator);
+  els.fmtList.addEventListener("click", toggleListOnLines);
   els.editor.addEventListener("scroll", syncFindOverlayScroll);
   els.settingsButton.addEventListener("click", openSettingsDialog);
   els.settingsForm.addEventListener("submit", onSettingsSubmit);
@@ -1490,6 +1506,7 @@ async function activateTab(relativePath, type, options = {}) {
     state.noteContent.set(relativePath, content);
     els.editor.disabled = false;
     els.editor.classList.remove("hidden");
+    els.formattingBar.classList.remove("hidden");
     els.imageViewer.classList.add("hidden");
     els.imageViewerImage.removeAttribute("src");
     els.editor.value = content;
@@ -1502,6 +1519,7 @@ async function activateTab(relativePath, type, options = {}) {
     state.activeContent = "";
     els.editor.disabled = true;
     els.editor.classList.add("hidden");
+    els.formattingBar.classList.add("hidden");
     els.imageViewer.classList.remove("hidden");
     const dataUrl = await globalThis.tektite.readAssetDataUrl(state.rootPath, relativePath);
     els.imageViewerImage.src = dataUrl;
@@ -1710,6 +1728,41 @@ function onFindBarKeydown(event) {
   return false;
 }
 
+function toggleHeading(level) {
+  const value = els.editor.value;
+  const start = els.editor.selectionStart;
+  const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+  const lineEnd = value.indexOf("\n", start);
+  const blockEnd = lineEnd === -1 ? value.length : lineEnd;
+  const line = value.substring(lineStart, blockEnd);
+  const prefix = "#".repeat(level) + " ";
+  const existingHeading = line.match(/^(#{1,6}) /);
+  let updated;
+  if (existingHeading?.[1] === "#".repeat(level)) {
+    updated = line.slice(prefix.length);
+  } else if (existingHeading) {
+    updated = prefix + line.slice(existingHeading[0].length);
+  } else {
+    updated = prefix + line;
+  }
+  const newCursor = lineStart + updated.length;
+  els.editor.value = value.substring(0, lineStart) + updated + value.substring(blockEnd);
+  els.editor.selectionStart = els.editor.selectionEnd = Math.min(newCursor, lineStart + updated.length);
+  onEditorInput();
+}
+
+function insertSeparator() {
+  const value = els.editor.value;
+  const start = els.editor.selectionStart;
+  const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+  const atLineStart = start === lineStart;
+  const insert = atLineStart ? "---\n" : "\n---\n";
+  const pos = atLineStart ? lineStart : start;
+  els.editor.value = value.substring(0, pos) + insert + value.substring(pos);
+  els.editor.selectionStart = els.editor.selectionEnd = pos + insert.length;
+  onEditorInput();
+}
+
 function toggleListOnLines() {
   const value = els.editor.value;
   const start = els.editor.selectionStart;
@@ -1831,6 +1884,7 @@ function showEmptyState(message = "Choose a local folder to start.") {
   els.editor.value = "";
   els.editor.disabled = true;
   els.editor.classList.remove("hidden");
+  els.formattingBar.classList.add("hidden");
   els.imageViewer.classList.add("hidden");
   els.imageViewerImage.removeAttribute("src");
   resetEditorHistory("", 0);
