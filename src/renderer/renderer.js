@@ -2259,7 +2259,42 @@ function contextFromTreeTarget(target) {
   };
 }
 
+function collectFolderPaths(node, rootPath) {
+  const paths = [];
+  if (node?.type !== "folder") return paths;
+  if (node.path !== "" || rootPath === "") paths.push(node.path);
+  for (const child of node.children || []) {
+    if (child.type === "folder") paths.push(...collectFolderPaths(child, rootPath));
+  }
+  return paths;
+}
+
+function expandAllFolders(context) {
+  const startNode = context.path === ""
+    ? state.tree
+    : findTreeNode(state.tree, context.path);
+  if (!startNode) return;
+  for (const p of collectFolderPaths(startNode, context.path)) {
+    state.collapsedFolders.delete(p);
+  }
+  saveCollapsedFolders();
+  renderTree();
+}
+
+function collapseAllFolders(context) {
+  const startNode = context.path === ""
+    ? state.tree
+    : findTreeNode(state.tree, context.path);
+  if (!startNode) return;
+  for (const p of collectFolderPaths(startNode, context.path)) {
+    state.collapsedFolders.add(p);
+  }
+  saveCollapsedFolders();
+  renderTree();
+}
+
 function openTreeContextMenu(x, y, context) {
+  const isFolder = context.type === "folder";
   const items = [
     {
       label: "New node",
@@ -2273,16 +2308,24 @@ function openTreeContextMenu(x, y, context) {
     }
   ];
 
+  if (isFolder || context.path === "") {
+    items.push(
+      { type: "separator" },
+      { label: "Expand All", action: () => expandAllFolders(context) },
+      { label: "Collapse All", action: () => collapseAllFolders(context) }
+    );
+  }
+
   if (context.path) {
     items.push(
       { type: "separator" },
       {
-        label: context.type === "folder" ? "Rename folder" : "Rename file",
+        label: isFolder ? "Rename folder" : "Rename file",
         shortcut: "⇧⌘R",
         action: () => renameSelectedEntry(context)
       },
       {
-        label: context.type === "folder" ? "Delete folder" : "Delete file",
+        label: isFolder ? "Delete folder" : "Delete file",
         shortcut: "⌘⌫",
         danger: true,
         action: () => deleteSelectedEntry(context)
@@ -3142,6 +3185,16 @@ function entryExists(path, type) {
   if (type === "note") return state.noteByPath.has(path);
   if (type === "asset") return treeEntryExists(state.tree, path, "asset");
   return folderExists(state.tree, path);
+}
+
+function findTreeNode(node, path) {
+  if (!node) return null;
+  if (node.path === path) return node;
+  for (const child of node.children || []) {
+    const found = findTreeNode(child, path);
+    if (found) return found;
+  }
+  return null;
 }
 
 function folderExists(node, path) {

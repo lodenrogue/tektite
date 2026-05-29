@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.29] - 2026-05-29
+
+- Expand All / Collapse All context menu actions on vault root and folder items
+
 ## [0.1.28] - 2026-05-29
 
 - Active editor tab uses same green highlight as selected file tree node
