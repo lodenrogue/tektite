@@ -1588,6 +1588,7 @@ function renderEditorTabs() {
 }
 
 async function closeEditorTab(path, type) {
+  const treeFocused = els.fileTree === document.activeElement || els.fileTree.contains(document.activeElement);
   const closingActive = path === state.activePath && type === state.activeType;
   if (closingActive) await flushActiveNote();
 
@@ -1604,9 +1605,11 @@ async function closeEditorTab(path, type) {
   const nextIndex = Math.min(index, state.openTabs.length - 1);
   const nextTab = nextIndex === -1 ? undefined : state.openTabs[nextIndex];
   if (nextTab) {
-    await activateTab(nextTab.path, nextTab.type);
+    await activateTab(nextTab.path, nextTab.type, { focusEditor: !treeFocused });
+    if (treeFocused) els.fileTree.focus();
   } else {
     showEmptyState("Select or create a note.");
+    if (treeFocused) els.fileTree.focus();
   }
   saveWorkspaceState();
 }

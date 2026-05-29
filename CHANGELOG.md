@@ -2,6 +2,12 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.28] - 2026-05-29
+
+- Active editor tab uses same green highlight as selected file tree node
+- Selected folder in tree uses a darker green than selected file
+- Cmd+W while file tree is focused keeps focus in tree after tab closes
+
 ## [0.1.27] - 2026-05-29
 
 - Formatting toolbar in editor pane with H1–H4 heading toggles, horizontal rule insert, and list toggle

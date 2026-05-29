@@ -18,6 +18,7 @@
   --quote-ink: #d4cab9;
   --tree-hover: rgba(255, 255, 255, 0.06);
   --tree-active-bg: #294449;
+  --tree-active-folder-bg: #162628;
   --tree-active-ink: #ecfbfb;
   --tree-guide: rgba(255, 255, 255, 0.12);
   --grid-line: rgba(101, 168, 173, 0.08);
@@ -52,6 +53,7 @@
   --quote-ink: #514b43;
   --tree-hover: rgba(255, 255, 255, 0.58);
   --tree-active-bg: #d9e8e8;
+  --tree-active-folder-bg: #a8c4c4;
   --tree-active-ink: #123c40;
   --tree-guide: rgba(118, 111, 100, 0.22);
   --grid-line: rgba(47, 111, 115, 0.08);
@@ -413,6 +415,11 @@ button.tree-row {
   background: var(--tree-active-bg);
   color: var(--tree-active-ink);
   font-weight: 680;
+}
+
+div.tree-row.selected,
+div.tree-row.active {
+  background: var(--tree-active-folder-bg);
 }
 
 .tree-row.selected .tree-caret,
@@ -817,9 +824,10 @@ button.tree-row {
 }
 
 .editor-tab.active {
-  border-color: var(--line);
-  background: var(--editor-bg);
-  color: var(--ink);
+  border-color: var(--tree-active-bg);
+  background: var(--tree-active-bg);
+  color: var(--tree-active-ink);
+  font-weight: 680;
 }
 
 .editor-tab .tree-kind-icon {
