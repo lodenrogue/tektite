@@ -2,6 +2,18 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.25] - 2026-05-29
+
+- Keyboard navigation in file tree: ↑/↓ navigate, →/← expand/collapse folders, Enter opens item, Tab moves to editor
+- Clicking file tree keeps focus in tree; Tab moves focus to editor
+- `Cmd+Backspace` deletes selected entry from tree
+- `Cmd+Shift+F` creates new folder (global shortcut + File menu)
+- `Cmd+Shift+R` renames selected entry (fixed conflict with `Cmd+R` refresh)
+- `Cmd+Shift+N` / `Cmd+Shift+F` / `Cmd+Shift+R` / `Cmd+Backspace` shown in context menu
+- New node/folder/rename/delete shortcuts respect currently selected tree item as target folder
+- After rename, delete, or create folder: focus returns to file tree
+- Fix: root-level files now align horizontally with root-level folder names
+
 ## [0.1.24] - 2026-05-29
 
 - Show/Hide Editor Pane and Show/Hide Preview Pane in View menu (with checkmarks)

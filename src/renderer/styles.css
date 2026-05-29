@@ -400,6 +400,10 @@ button.tree-row {
   font: inherit;
 }
 
+#fileTree > button.tree-row:not(.vault-root-row) {
+  padding-left: 34px;
+}
+
 .tree-row:hover {
   background: var(--tree-hover);
 }
