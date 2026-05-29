@@ -187,11 +187,6 @@ function boot() {
   els.fileTree.addEventListener("drop", onTreeDrop);
   els.fileTree.addEventListener("contextmenu", onTreeContextMenu);
   els.fileTree.addEventListener("click", closeTreeContextMenu);
-  els.fileTree.addEventListener("mousedown", (event) => {
-    if (event.target.closest(".tree-row, .tree-caret-button, .tree-label-button")) {
-      event.preventDefault();
-    }
-  });
   els.fileTree.addEventListener("keydown", onTreeKeydown);
   els.preview.addEventListener("click", onPreviewClick);
   els.previewBackButton.addEventListener("click", goBackPreviewHistory);

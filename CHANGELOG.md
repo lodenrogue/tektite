@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.31] - 2026-05-29
+
+- Fix: drag and drop of files/folders in file tree restored (broken by mousedown preventDefault)
+- Fix: `role="tree"` on file tree nav element resolves SonarQube tabindex accessibility warning
+
 ## [0.1.30] - 2026-05-29
 
 - Formatting bar: Link and Image buttons insert markdown link/image syntax
