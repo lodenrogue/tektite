@@ -2,7 +2,7 @@
 
 All notable changes to Tektite are documented here.
 
-## [0.1.23] - 2026-05-28
+## [0.1.23] - 2026-05-29
 
 - `Cmd+Shift+8` toggles markdown bullet list on selected lines
 - `Tab` inserts tab character in editor (multi-line selection indents all lines)
