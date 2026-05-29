@@ -493,6 +493,11 @@ button.tree-row {
   overflow: hidden;
 }
 
+.editor-pane.pane-hidden,
+.preview-pane.pane-hidden {
+  overflow: hidden;
+}
+
 .editor-pane,
 .preview-pane,
 .sidebar-tags-pane,
@@ -563,7 +568,16 @@ button.tree-row {
 }
 
 .editor-pane {
+  grid-column: 1;
   border-right: 0;
+}
+
+.resizer-workspace {
+  grid-column: 2;
+}
+
+.preview-pane {
+  grid-column: 3;
 }
 
 .note-toolbar {

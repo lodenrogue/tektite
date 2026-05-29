@@ -9,6 +9,7 @@ let aboutWindow;
 let splashWindow;
 let splashShownAt = 0;
 let recentVaults = [];
+const windowPaneStates = new Map();
 let isQuitting = false;
 const windowVaults = new Map();
 let cachedStore = { lastVault: null, workspaces: {}, sessions: [] };
@@ -305,6 +306,7 @@ async function saveOpenSessions() {
 
 function buildMenu() {
   const isMac = process.platform === "darwin";
+  const s = windowPaneStates.get(activeTektiteWindow());
   const recentVaultItems = recentVaults.length > 0
     ? recentVaults.map((vaultPath) => ({
         label: path.basename(vaultPath) || vaultPath,
@@ -403,7 +405,9 @@ function buildMenu() {
         },
         { type: "separator" },
         {
-          label: "Show/Hide File Suffixes",
+          label: "Show File Suffixes",
+          type: "checkbox",
+          checked: s?.showFileExtensions === true,
           click: () => sendToActiveWindow("menu:toggle-file-suffixes")
         },
         {
@@ -411,11 +415,27 @@ function buildMenu() {
           click: () => sendToActiveWindow("menu:toggle-theme")
         },
         {
-          label: "Show/Hide Tags Pane",
+          label: "Show Editor Pane",
+          type: "checkbox",
+          checked: s?.showEditorPane !== false,
+          click: () => sendToActiveWindow("menu:toggle-editor-pane")
+        },
+        {
+          label: "Show Preview Pane",
+          type: "checkbox",
+          checked: s?.showPreviewPane !== false,
+          click: () => sendToActiveWindow("menu:toggle-preview-pane")
+        },
+        {
+          label: "Show Tags Pane",
+          type: "checkbox",
+          checked: s?.showTagsPane !== false,
           click: () => sendToActiveWindow("menu:toggle-tags-pane")
         },
         {
-          label: "Show/Hide Graph Pane",
+          label: "Show Graph Pane",
+          type: "checkbox",
+          checked: s?.showGraphPane !== false,
           click: () => sendToActiveWindow("menu:toggle-graph-pane")
         },
         { type: "separator" },
@@ -591,6 +611,14 @@ ipcMain.handle("workspace:save", async (event, rootPath, workspace) => {
   }
   await saveWorkspaceStore(store);
   return true;
+});
+
+ipcMain.handle("window:pane-state", (event, paneState) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    windowPaneStates.set(win, paneState);
+    buildMenu();
+  }
 });
 
 ipcMain.handle("window:register", () => {

@@ -2,6 +2,12 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.24] - 2026-05-29
+
+- Show/Hide Editor Pane and Show/Hide Preview Pane in View menu (with checkmarks)
+- All View menu toggles (editor, preview, tags, graph, file suffixes) now show checkmarks reflecting current state
+- Fix: hiding editor pane no longer accidentally reveals hidden preview pane
+
 ## [0.1.23] - 2026-05-29
 
 - `Cmd+Shift+8` toggles markdown bullet list on selected lines

@@ -13,6 +13,8 @@ const state = {
   selectedPath: "",
   selectedType: "folder",
   showFileExtensions: false,
+  showEditorPane: true,
+  showPreviewPane: true,
   showTagsPane: true,
   showGraphPane: true,
   tagsContentCollapsed: false,
@@ -149,6 +151,8 @@ boot();
 
 function boot() {
   state.showFileExtensions = localStorage.getItem("tektite:showFileExtensions") === "1";
+  state.showEditorPane = localStorage.getItem("tektite:showEditorPane") !== "0";
+  state.showPreviewPane = localStorage.getItem("tektite:showPreviewPane") !== "0";
   state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
   state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
   state.tagsContentCollapsed = localStorage.getItem("tektite:tagsContentCollapsed") === "1";
@@ -258,11 +262,16 @@ function boot() {
   globalThis.tektite.onRefreshVault(refreshVault);
   globalThis.tektite.onToggleFileSuffixes(toggleFileExtensions);
   globalThis.tektite.onToggleTheme(toggleTheme);
+  globalThis.tektite.onToggleEditorPane(toggleEditorPane);
+  globalThis.tektite.onTogglePreviewPane(togglePreviewPane);
   globalThis.tektite.onToggleTagsPane(toggleTagsPane);
   globalThis.tektite.onToggleGraphPane(toggleGraphPane);
   globalThis.tektite.onOpenSettings(openSettingsDialog);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
+  applyEditorPaneVisibility();
+  applyPreviewPaneVisibility();
+  syncPaneStateToMenu();
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
   globalThis.tektite.registerWindow();
@@ -366,7 +375,15 @@ function applyLayout() {
   els.sidebar.style.gridTemplateRows = `auto auto minmax(${FILE_TREE_MIN_HEIGHT}px, 1fr) ${tagsRows} ${graphRows}`;
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
   const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
-  els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
+  if (!state.showEditorPane && !state.showPreviewPane) {
+    els.workspace.style.gridTemplateColumns = `0 0 0`;
+  } else if (!state.showEditorPane) {
+    els.workspace.style.gridTemplateColumns = `0 0 minmax(0, 1fr)`;
+  } else if (!state.showPreviewPane) {
+    els.workspace.style.gridTemplateColumns = `minmax(0, 1fr) 0 0`;
+  } else {
+    els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
+  }
 }
 
 function sidebarPaneRows({ visible, collapsed, minHeight, height }) {
@@ -501,18 +518,57 @@ function toggleFileExtensions() {
   updateSuffixButton();
   renderTree();
   renderEditorTabs();
+  syncPaneStateToMenu();
+}
+
+function toggleEditorPane() {
+  state.showEditorPane = !state.showEditorPane;
+  localStorage.setItem("tektite:showEditorPane", state.showEditorPane ? "1" : "0");
+  applyEditorPaneVisibility();
+  syncPaneStateToMenu();
+}
+
+function togglePreviewPane() {
+  state.showPreviewPane = !state.showPreviewPane;
+  localStorage.setItem("tektite:showPreviewPane", state.showPreviewPane ? "1" : "0");
+  applyPreviewPaneVisibility();
+  syncPaneStateToMenu();
+}
+
+function syncPaneStateToMenu() {
+  globalThis.tektite.setPaneState({
+    showEditorPane: state.showEditorPane,
+    showPreviewPane: state.showPreviewPane,
+    showTagsPane: state.showTagsPane,
+    showGraphPane: state.showGraphPane,
+    showFileExtensions: state.showFileExtensions
+  }).catch(() => {});
+}
+
+function applyEditorPaneVisibility() {
+  document.querySelector(".editor-pane").classList.toggle("pane-hidden", !state.showEditorPane);
+  els.workspaceResizer.hidden = !state.showEditorPane || !state.showPreviewPane;
+  applyLayout();
+}
+
+function applyPreviewPaneVisibility() {
+  document.querySelector(".preview-pane").classList.toggle("pane-hidden", !state.showPreviewPane);
+  els.workspaceResizer.hidden = !state.showEditorPane || !state.showPreviewPane;
+  applyLayout();
 }
 
 function toggleGraphPane() {
   state.showGraphPane = !state.showGraphPane;
   localStorage.setItem("tektite:showGraphPane", state.showGraphPane ? "1" : "0");
   applyGraphPaneVisibility();
+  syncPaneStateToMenu();
 }
 
 function toggleTagsPane() {
   state.showTagsPane = !state.showTagsPane;
   localStorage.setItem("tektite:showTagsPane", state.showTagsPane ? "1" : "0");
   applyTagsPaneVisibility();
+  syncPaneStateToMenu();
 }
 
 function toggleTagsContent() {
