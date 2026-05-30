@@ -63,7 +63,8 @@ const state = {
     index: -1
   },
   settings: {
-    templatesPath: ""
+    templatesPath: "",
+    autoLinkUrls: false
   }
 };
 
@@ -132,6 +133,7 @@ const els = {
   settingsDialog: document.getElementById("settingsDialog"),
   settingsForm: document.getElementById("settingsForm"),
   templatesPathInput: document.getElementById("templatesPathInput"),
+  autoLinkUrlsCheckbox: document.getElementById("autoLinkUrlsCheckbox"),
   cancelSettingsButton: document.getElementById("cancelSettingsButton"),
   cancelSettingsXButton: document.getElementById("cancelSettingsXButton"),
   gitOutputDialog: document.getElementById("gitOutputDialog"),
@@ -714,7 +716,7 @@ async function openVault(rootPath) {
     state.hasGitRepo = Boolean(vault.hasGitRepo);
     state.gitProvider = vault.gitProvider || null;
     globalThis.tektite.loadSettings(state.rootPath)
-      .then((s) => { state.settings = s || { templatesPath: "" }; })
+      .then((s) => { state.settings = { templatesPath: "", autoLinkUrls: false, ...s }; })
       .catch(() => { state.settings = { templatesPath: "" }; });
     state.activePath = null;
     state.activeType = null;
@@ -2020,6 +2022,7 @@ function closeGitOutputDialog() {
 
 function openSettingsDialog() {
   els.templatesPathInput.value = state.settings.templatesPath || "";
+  els.autoLinkUrlsCheckbox.checked = Boolean(state.settings.autoLinkUrls);
   els.settingsDialog.setAttribute("open", "");
   els.settingsDialog.classList.remove("hidden");
   requestAnimationFrame(() => els.templatesPathInput.focus());
@@ -2033,7 +2036,8 @@ function closeSettingsDialog() {
 async function onSettingsSubmit(event) {
   event.preventDefault();
   const templatesPath = els.templatesPathInput.value.trim();
-  state.settings = { templatesPath };
+  const autoLinkUrls = els.autoLinkUrlsCheckbox.checked;
+  state.settings = { templatesPath, autoLinkUrls };
   if (state.rootPath) {
     await globalThis.tektite.saveSettings(state.rootPath, state.settings).catch(() => {});
   }
@@ -2740,6 +2744,12 @@ function inlineMarkdown(value, sourcePath = "") {
     const data = note ? ` data-note-path="${escapeAttr(note.path)}"` : "";
     return stash(tokens, `<a href="#" class="${className}"${data}>${escapeHtml(label)}</a>`);
   });
+
+  if (state.settings.autoLinkUrls) {
+    text = text.replace(/https?:\/\/[^\s<>"'()[\]]+/g, (url) =>
+      stash(tokens, `<a href="${escapeAttr(url)}" target="_blank" rel="noreferrer">${url}</a>`)
+    );
+  }
 
   text = text
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")

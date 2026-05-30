@@ -766,7 +766,10 @@ ipcMain.handle("settings:load", async (_event, rootPath) => {
     assertInsideVault(rootPath, settingsFile);
     const raw = await fs.readFile(settingsFile, "utf8");
     const parsed = JSON.parse(raw);
-    return { templatesPath: typeof parsed.templatesPath === "string" ? parsed.templatesPath : "" };
+    return {
+      templatesPath: typeof parsed.templatesPath === "string" ? parsed.templatesPath : "",
+      autoLinkUrls: Boolean(parsed.autoLinkUrls)
+    };
   } catch {
     return { templatesPath: "" };
   }

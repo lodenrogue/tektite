@@ -199,6 +199,10 @@
         <label class="field-label" for="templatesPathInput">Templates folder</label>
         <input id="templatesPathInput" class="modal-input" type="text" autocomplete="off" placeholder=".tektite/templates" />
         <p class="field-hint">Path relative to vault root. Leave blank to use default (<code>.tektite/templates</code>).</p>
+        <div class="settings-checkbox-row">
+          <input type="checkbox" id="autoLinkUrlsCheckbox" />
+          <label for="autoLinkUrlsCheckbox">Link bare URLs in preview (e.g. https://example.com)</label>
+        </div>
         <footer class="modal-actions">
           <button id="cancelSettingsButton" class="secondary-button" type="button">Cancel</button>
           <button id="saveSettingsButton" class="primary-button" type="submit">Save</button>

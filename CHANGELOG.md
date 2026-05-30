@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.34] - 2026-05-30
+
+- Settings: "Link bare URLs in preview" checkbox — auto-links plain `https://` URLs in preview when enabled (default: off)
+
 ## [0.1.33] - 2026-05-30
 
 - Formatting bar: Bold, Italic, Strikethrough buttons (wrap/unwrap selection or insert placeholder)
