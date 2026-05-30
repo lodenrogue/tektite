@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld("tektite", {
   readAssetDataUrl: (rootPath, relativePath) =>
     ipcRenderer.invoke("asset:read-data-url", rootPath, relativePath),
   setVaultWindowTitle: (vaultName) => ipcRenderer.invoke("window:set-vault-name", vaultName),
+  printPreview: (payload) => ipcRenderer.invoke("preview:print", payload),
   syncGit: (rootPath) => ipcRenderer.invoke("git:sync", rootPath),
   loadWorkspaceState: (rootPath) => ipcRenderer.invoke("workspace:load", rootPath),
   saveWorkspaceState: (rootPath, workspace) => ipcRenderer.invoke("workspace:save", rootPath, workspace),
@@ -36,6 +37,7 @@ contextBridge.exposeInMainWorld("tektite", {
   onNewFolder: (callback) => ipcRenderer.on("menu:new-folder", callback),
   onCloseTab: (callback) => ipcRenderer.on("menu:close-tab", callback),
   onCloseAllTabs: (callback) => ipcRenderer.on("menu:close-all-tabs", callback),
+  onPrintPreview: (callback) => ipcRenderer.on("menu:print-preview", callback),
   onRefreshVault: (callback) => ipcRenderer.on("menu:refresh-vault", callback),
   onToggleFileSuffixes: (callback) => ipcRenderer.on("menu:toggle-file-suffixes", callback),
   onToggleTheme: (callback) => ipcRenderer.on("menu:toggle-theme", callback),

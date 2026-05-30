@@ -102,6 +102,7 @@ const els = {
   imageViewerImage: document.getElementById("imageViewerImage"),
   mentionMenu: document.getElementById("mentionMenu"),
   preview: document.getElementById("preview"),
+  previewPrintButton: document.getElementById("previewPrintButton"),
   previewBackButton: document.getElementById("previewBackButton"),
   previewForwardButton: document.getElementById("previewForwardButton"),
   graph: document.getElementById("graph"),
@@ -194,6 +195,7 @@ function boot() {
   els.fileTree.addEventListener("click", closeTreeContextMenu);
   els.fileTree.addEventListener("keydown", onTreeKeydown);
   els.preview.addEventListener("click", onPreviewClick);
+  els.previewPrintButton.addEventListener("click", printCurrentPreview);
   els.previewBackButton.addEventListener("click", goBackPreviewHistory);
   els.previewForwardButton.addEventListener("click", goForwardPreviewHistory);
   els.graphSvg.addEventListener("click", onGraphClick);
@@ -287,6 +289,7 @@ function boot() {
   globalThis.tektite.onNewFolder(() => createFolder());
   globalThis.tektite.onCloseTab(closeActiveEditorTab);
   globalThis.tektite.onCloseAllTabs(closeAllEditorTabs);
+  globalThis.tektite.onPrintPreview(printCurrentPreview);
   globalThis.tektite.onRefreshVault(refreshVault);
   globalThis.tektite.onToggleFileSuffixes(toggleFileExtensions);
   globalThis.tektite.onToggleTheme(toggleTheme);
@@ -2547,6 +2550,30 @@ function collapsedFoldersKey() {
 
 function renderPreview(markdown) {
   els.preview.innerHTML = markdownToHtml(markdown, state.activePath);
+}
+
+async function printCurrentPreview() {
+  if (!state.activePath && !els.preview.textContent.trim()) return;
+
+  if (state.activeType === "note") {
+    state.activeContent = els.editor.value;
+    if (state.activePath) state.noteContent.set(state.activePath, state.activeContent);
+    renderPreview(state.activeContent);
+  }
+
+  try {
+    const result = await globalThis.tektite.printPreview({
+      title: els.noteTitle.textContent || "Tektite",
+      path: state.activePath || "",
+      html: els.preview.innerHTML
+    });
+
+    if (result && result.ok === false && result.error && result.error !== "Print canceled.") {
+      console.error("[tektite:renderer] print failed", result.error);
+    }
+  } catch (error) {
+    console.error("[tektite:renderer] print failed", error);
+  }
 }
 
 function markdownToHtml(markdown, sourcePath = "") {

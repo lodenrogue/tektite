@@ -2,6 +2,12 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.35] - 2026-05-31
+
+- Print current preview via File › Print... (`Cmd+P`) or the preview pane print icon
+- Print uses the native system dialog, including macOS Save as PDF
+- Fix: file tree markup now matches the custom tree role expected by SonarQube accessibility checks
+
 ## [0.1.34] - 2026-05-30
 
 - Settings: "Link bare URLs in preview" checkbox — auto-links plain `https://` URLs in preview when enabled (default: off)
