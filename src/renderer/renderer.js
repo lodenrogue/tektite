@@ -139,6 +139,9 @@ const els = {
   closeGitOutputButton: document.getElementById("closeGitOutputButton"),
   closeGitOutputXButton: document.getElementById("closeGitOutputXButton"),
   formattingBar: document.getElementById("formattingBar"),
+  fmtBold: document.getElementById("fmtBold"),
+  fmtItalic: document.getElementById("fmtItalic"),
+  fmtStrike: document.getElementById("fmtStrike"),
   fmtH1: document.getElementById("fmtH1"),
   fmtH2: document.getElementById("fmtH2"),
   fmtH3: document.getElementById("fmtH3"),
@@ -238,6 +241,9 @@ function boot() {
   els.formattingBar.addEventListener("mousedown", (event) => {
     if (event.target.closest(".fmt-button")) event.preventDefault();
   });
+  els.fmtBold.addEventListener("click", () => toggleInlineFormat("**", "**", "bold text"));
+  els.fmtItalic.addEventListener("click", () => toggleInlineFormat("*", "*", "italic text"));
+  els.fmtStrike.addEventListener("click", () => toggleInlineFormat("~~", "~~", "strikethrough"));
   els.fmtH1.addEventListener("click", () => toggleHeading(1));
   els.fmtH2.addEventListener("click", () => toggleHeading(2));
   els.fmtH3.addEventListener("click", () => toggleHeading(3));
@@ -1730,6 +1736,36 @@ function onFindBarKeydown(event) {
   return false;
 }
 
+function toggleInlineFormat(prefix, suffix, placeholder) {
+  const value = els.editor.value;
+  const start = els.editor.selectionStart;
+  const end = els.editor.selectionEnd;
+  const selected = value.substring(start, end);
+  const pLen = prefix.length;
+  const sLen = suffix.length;
+
+  if (selected) {
+    const isWrapped = selected.startsWith(prefix) && selected.endsWith(suffix) && selected.length > pLen + sLen;
+    if (isWrapped) {
+      const inner = selected.slice(pLen, -sLen);
+      els.editor.value = value.substring(0, start) + inner + value.substring(end);
+      els.editor.selectionStart = start;
+      els.editor.selectionEnd = start + inner.length;
+    } else {
+      const wrapped = `${prefix}${selected}${suffix}`;
+      els.editor.value = value.substring(0, start) + wrapped + value.substring(end);
+      els.editor.selectionStart = start;
+      els.editor.selectionEnd = start + wrapped.length;
+    }
+  } else {
+    const snippet = `${prefix}${placeholder}${suffix}`;
+    els.editor.value = value.substring(0, start) + snippet + value.substring(end);
+    els.editor.selectionStart = start + pLen;
+    els.editor.selectionEnd = start + pLen + placeholder.length;
+  }
+  onEditorInput();
+}
+
 function toggleHeading(level) {
   const value = els.editor.value;
   const start = els.editor.selectionStart;
@@ -2531,12 +2567,16 @@ function markdownToHtml(markdown, sourcePath = "") {
   return context.blocks.join("\n") || "<p>Start writing.</p>";
 }
 
+function appendListItem(context, match, tag) {
+  flushMarkdownParagraph(context);
+  const indent = match[1].replaceAll("\t", "  ").length;
+  if (context.list.length && context.list[0].tag !== tag) flushMarkdownList(context);
+  context.list.push({ text: match[2], indent, tag });
+}
+
 function processMarkdownLine(context, line) {
   if (line.startsWith("```")) return toggleMarkdownCode(context);
-  if (context.inCode) {
-    context.code.push(line);
-    return;
-  }
+  if (context.inCode) { context.code.push(line); return; }
   if (!line.trim()) return flushMarkdownBlocks(context);
 
   const heading = line.match(/^(#{1,6})\s+(.+)$/);
@@ -2544,22 +2584,10 @@ function processMarkdownLine(context, line) {
   if (/^---+$/.test(line.trim())) return appendMarkdownRule(context);
 
   const unorderedItem = line.match(/^(\s*)[-*+]\s+(.+)$/);
-  if (unorderedItem) {
-    flushMarkdownParagraph(context);
-    const indent = unorderedItem[1].replaceAll("\t", "  ").length;
-    if (context.list.length && context.list[0].tag === "ol") flushMarkdownList(context);
-    context.list.push({ text: unorderedItem[2], indent, tag: "ul" });
-    return;
-  }
+  if (unorderedItem) { appendListItem(context, unorderedItem, "ul"); return; }
 
   const orderedItem = line.match(/^(\s*)\d+\.\s+(.+)$/);
-  if (orderedItem) {
-    flushMarkdownParagraph(context);
-    const indent = orderedItem[1].replaceAll("\t", "  ").length;
-    if (context.list.length && context.list[0].tag === "ul") flushMarkdownList(context);
-    context.list.push({ text: orderedItem[2], indent, tag: "ol" });
-    return;
-  }
+  if (orderedItem) { appendListItem(context, orderedItem, "ol"); return; }
 
   if (/^\|.*\|/.test(line)) {
     flushMarkdownParagraph(context);
@@ -2568,9 +2596,7 @@ function processMarkdownLine(context, line) {
     context.table.push(line);
     return;
   }
-  if (context.table) {
-    flushMarkdownTable(context);
-  }
+  if (context.table) flushMarkdownTable(context);
 
   const quote = line.match(/^>\s?(.*)$/);
   if (quote) return appendMarkdownQuote(context, quote[1]);
@@ -2603,7 +2629,10 @@ function flushMarkdownTable(context) {
     .map((c) => `<th>${inlineMarkdown(c, context.sourcePath)}</th>`)
     .join("");
   const bodyHtml = bodyRows
-    .map((r) => `<tr>${parseCells(r).map((c) => `<td>${inlineMarkdown(c, context.sourcePath)}</td>`).join("")}</tr>`)
+    .map((r) => {
+      const tds = parseCells(r).map((c) => `<td>${inlineMarkdown(c, context.sourcePath)}</td>`).join("");
+      return `<tr>${tds}</tr>`;
+    })
     .join("");
   context.blocks.push(`<table><thead><tr>${thCells}</tr></thead><tbody>${bodyHtml}</tbody></table>`);
   context.table = null;
@@ -2626,11 +2655,16 @@ function buildNestedList(items, sourcePath) {
     if (item.indent > baseIndent) { i++; continue; }
     let j = i + 1;
     while (j < items.length && items[j].indent > baseIndent) j++;
-    const checkMatch = item.text.match(/^\[( |x)\]\s+(.+)$/i);
-    const liContent = checkMatch
-      ? `<input type="checkbox" disabled${checkMatch[1].toLowerCase() === "x" ? " checked" : ""}> ${inlineMarkdown(checkMatch[2], sourcePath)}`
-      : inlineMarkdown(item.text, sourcePath);
-    html += `<li class="${checkMatch ? "task-item" : ""}">${liContent}${buildNestedList(items.slice(i + 1, j), sourcePath)}</li>`;
+    const checkMatch = item.text.match(/^\[([x ])\]\s+(.+)$/i);
+    let liContent;
+    if (checkMatch) {
+      const checked = checkMatch[1].toLowerCase() === "x" ? " checked" : "";
+      liContent = `<input type="checkbox" disabled${checked}> ${inlineMarkdown(checkMatch[2], sourcePath)}`;
+    } else {
+      liContent = inlineMarkdown(item.text, sourcePath);
+    }
+    const liClass = checkMatch ? " class=\"task-item\"" : "";
+    html += `<li${liClass}>${liContent}${buildNestedList(items.slice(i + 1, j), sourcePath)}</li>`;
     i = j;
   }
   return `${html}</${tag}>`;
@@ -2709,9 +2743,7 @@ function inlineMarkdown(value, sourcePath = "") {
 
   text = text
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/_([^_]+)_/g, "<em>$1</em>")
     .replace(/~~([^~]+)~~/g, "<del>$1</del>")
     .replace(/:([a-z0-9_+-]+):/g, (_m, name) => emojiChar(name) || _m);
 

@@ -770,6 +770,10 @@ div.tree-row.active {
   line-height: 1;
 }
 
+.fmt-button--bold { font-weight: 800; }
+.fmt-button--italic { font-style: italic; font-weight: 600; }
+.fmt-button--strike { text-decoration: line-through; }
+
 .fmt-button svg {
   width: 15px;
   height: 15px;

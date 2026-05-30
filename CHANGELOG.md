@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.33] - 2026-05-30
+
+- Formatting bar: Bold, Italic, Strikethrough buttons (wrap/unwrap selection or insert placeholder)
+- Fix: links no longer show as raw stash tokens (removed `_italic_` variant that corrupted stash keys)
+
 ## [0.1.32] - 2026-05-30
 
 - Fix: nested unordered lists now render correctly with proper indentation in preview
