@@ -2,6 +2,12 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.32] - 2026-05-30
+
+- Fix: nested unordered lists now render correctly with proper indentation in preview
+- Fix: ordered lists (`1. Item`) now render as `<ol>` with nested support in preview
+- Fix: nested list items no longer add extra bottom margin
+
 ## [0.1.31] - 2026-05-29
 
 - Fix: drag and drop of files/folders in file tree restored (broken by mousedown preventDefault)

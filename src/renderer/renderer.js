@@ -2541,10 +2541,21 @@ function processMarkdownLine(context, line) {
   if (heading) return appendMarkdownHeading(context, heading);
   if (/^---+$/.test(line.trim())) return appendMarkdownRule(context);
 
-  const listItem = line.match(/^\s*[-*+]\s+(.+)$/);
-  if (listItem) {
+  const unorderedItem = line.match(/^(\s*)[-*+]\s+(.+)$/);
+  if (unorderedItem) {
     flushMarkdownParagraph(context);
-    context.list.push(listItem[1]);
+    const indent = unorderedItem[1].replaceAll("\t", "  ").length;
+    if (context.list.length && context.list[0].tag === "ol") flushMarkdownList(context);
+    context.list.push({ text: unorderedItem[2], indent, tag: "ul" });
+    return;
+  }
+
+  const orderedItem = line.match(/^(\s*)\d+\.\s+(.+)$/);
+  if (orderedItem) {
+    flushMarkdownParagraph(context);
+    const indent = orderedItem[1].replaceAll("\t", "  ").length;
+    if (context.list.length && context.list[0].tag === "ul") flushMarkdownList(context);
+    context.list.push({ text: orderedItem[2], indent, tag: "ol" });
     return;
   }
 
@@ -2574,12 +2585,26 @@ function flushMarkdownParagraph(context) {
   context.paragraph = [];
 }
 
+function buildNestedList(items, sourcePath) {
+  if (!items.length) return "";
+  const baseIndent = items[0].indent;
+  const tag = items[0].tag || "ul";
+  let html = `<${tag}>`;
+  let i = 0;
+  while (i < items.length) {
+    const item = items[i];
+    if (item.indent > baseIndent) { i++; continue; }
+    let j = i + 1;
+    while (j < items.length && items[j].indent > baseIndent) j++;
+    html += `<li>${inlineMarkdown(item.text, sourcePath)}${buildNestedList(items.slice(i + 1, j), sourcePath)}</li>`;
+    i = j;
+  }
+  return `${html}</${tag}>`;
+}
+
 function flushMarkdownList(context) {
   if (!context.list.length) return;
-  const items = context.list
-    .map((item) => `<li>${inlineMarkdown(item, context.sourcePath)}</li>`)
-    .join("");
-  context.blocks.push(`<ul>${items}</ul>`);
+  context.blocks.push(buildNestedList(context.list, context.sourcePath));
   context.list = [];
 }
 
