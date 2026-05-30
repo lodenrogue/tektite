@@ -2515,6 +2515,7 @@ function markdownToHtml(markdown, sourcePath = "") {
     blocks: [],
     paragraph: [],
     list: [],
+    table: null,
     inCode: false,
     code: []
   };
@@ -2525,6 +2526,7 @@ function markdownToHtml(markdown, sourcePath = "") {
 
   flushMarkdownParagraph(context);
   flushMarkdownList(context);
+  flushMarkdownTable(context);
   if (context.inCode) flushMarkdownCode(context, true);
   return context.blocks.join("\n") || "<p>Start writing.</p>";
 }
@@ -2559,6 +2561,17 @@ function processMarkdownLine(context, line) {
     return;
   }
 
+  if (/^\|.*\|/.test(line)) {
+    flushMarkdownParagraph(context);
+    flushMarkdownList(context);
+    context.table = context.table || [];
+    context.table.push(line);
+    return;
+  }
+  if (context.table) {
+    flushMarkdownTable(context);
+  }
+
   const quote = line.match(/^>\s?(.*)$/);
   if (quote) return appendMarkdownQuote(context, quote[1]);
   context.paragraph.push(line.trim());
@@ -2577,6 +2590,23 @@ function toggleMarkdownCode(context) {
 function flushMarkdownBlocks(context) {
   flushMarkdownParagraph(context);
   flushMarkdownList(context);
+  flushMarkdownTable(context);
+}
+
+function flushMarkdownTable(context) {
+  if (!context.table?.length) return;
+  const rows = context.table.filter((r) => !/^\|[-| :]+\|/.test(r.trim()));
+  const [headerRow, ...bodyRows] = rows;
+  const parseCells = (row) =>
+    row.split("|").slice(1, -1).map((c) => c.trim());
+  const thCells = parseCells(headerRow)
+    .map((c) => `<th>${inlineMarkdown(c, context.sourcePath)}</th>`)
+    .join("");
+  const bodyHtml = bodyRows
+    .map((r) => `<tr>${parseCells(r).map((c) => `<td>${inlineMarkdown(c, context.sourcePath)}</td>`).join("")}</tr>`)
+    .join("");
+  context.blocks.push(`<table><thead><tr>${thCells}</tr></thead><tbody>${bodyHtml}</tbody></table>`);
+  context.table = null;
 }
 
 function flushMarkdownParagraph(context) {
@@ -2596,7 +2626,11 @@ function buildNestedList(items, sourcePath) {
     if (item.indent > baseIndent) { i++; continue; }
     let j = i + 1;
     while (j < items.length && items[j].indent > baseIndent) j++;
-    html += `<li>${inlineMarkdown(item.text, sourcePath)}${buildNestedList(items.slice(i + 1, j), sourcePath)}</li>`;
+    const checkMatch = item.text.match(/^\[( |x)\]\s+(.+)$/i);
+    const liContent = checkMatch
+      ? `<input type="checkbox" disabled${checkMatch[1].toLowerCase() === "x" ? " checked" : ""}> ${inlineMarkdown(checkMatch[2], sourcePath)}`
+      : inlineMarkdown(item.text, sourcePath);
+    html += `<li class="${checkMatch ? "task-item" : ""}">${liContent}${buildNestedList(items.slice(i + 1, j), sourcePath)}</li>`;
     i = j;
   }
   return `${html}</${tag}>`;
@@ -2675,9 +2709,44 @@ function inlineMarkdown(value, sourcePath = "") {
 
   text = text
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/_([^_]+)_/g, "<em>$1</em>")
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/:([a-z0-9_+-]+):/g, (_m, name) => emojiChar(name) || _m);
 
   return restore(tokens, text);
+}
+
+const EMOJI_MAP = {
+  joy: "😂", smile: "😊", laughing: "😆", grinning: "😀", smiley: "😃",
+  wink: "😉", blush: "😊", heart_eyes: "😍", kissing_heart: "😘", stuck_out_tongue: "😛",
+  thinking: "🤔", hushed: "😯", astonished: "😲", flushed: "😳", sob: "😭",
+  cry: "😢", rage: "😡", angry: "😠", expressionless: "😑", neutral_face: "😐",
+  sweat_smile: "😅", sweat: "😓", weary: "😩", tired_face: "😫", dizzy_face: "😵",
+  sunglasses: "😎", nerd_face: "🤓", monocle_face: "🧐", face_with_raised_eyebrow: "🤨",
+  heart: "❤️", orange_heart: "🧡", yellow_heart: "💛", green_heart: "💚",
+  blue_heart: "💙", purple_heart: "💜", broken_heart: "💔", sparkling_heart: "💖",
+  thumbsup: "+1", thumbsdown: "-1", clap: "👏", raised_hands: "🙌", pray: "🙏",
+  wave: "👋", point_right: "👉", point_left: "👈", point_up: "👆", point_down: "👇",
+  fire: "🔥", star: "⭐", sparkles: "✨", tada: "🎉", trophy: "🏆",
+  rocket: "🚀", bulb: "💡", warning: "⚠️", check: "✅", x: "❌",
+  information_source: "ℹ️", question: "❓", exclamation: "❗", zap: "⚡",
+  bug: "🐛", hammer: "🔨", wrench: "🔧", gear: "⚙️", lock: "🔒",
+  key: "🔑", eyes: "👀", ear: "👂", brain: "🧠", muscle: "💪",
+  100: "💯", ok_hand: "👌", v: "✌️", raised_hand: "✋", fist: "✊",
+  computer: "💻", iphone: "📱", email: "📧", memo: "📝", clipboard: "📋",
+  calendar: "📅", books: "📚", book: "📖", pencil: "✏️", link: "🔗",
+  dog: "🐶", cat: "🐱", mouse: "🐭", pizza: "🍕", coffee: "☕",
+  beer: "🍺", cake: "🎂", apple: "🍎", tada2: "🎊", gift: "🎁",
+  sun: "☀️", cloud: "☁️", umbrella: "☂️", snowflake: "❄️", rainbow: "🌈",
+  earth_americas: "🌎", earth_asia: "🌏", earth_africa: "🌍", globe_with_meridians: "🌐",
+  white_check_mark: "✅", heavy_check_mark: "✔️", heavy_plus_sign: "➕",
+  heavy_minus_sign: "➖", heavy_division_sign: "➗", heavy_multiplication_x: "✖️"
+};
+
+function emojiChar(name) {
+  return EMOJI_MAP[name] || null;
 }
 
 function resolveNote(target, sourcePath = "") {

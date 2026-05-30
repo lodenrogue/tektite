@@ -1061,6 +1061,43 @@ div.tree-row.active {
   margin-bottom: 0;
 }
 
+.markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 0.95em;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--line);
+  padding: 7px 12px;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: var(--panel-strong);
+  font-weight: 680;
+}
+
+.markdown-preview tr:nth-child(even) td {
+  background: var(--panel-strong);
+}
+
+.markdown-preview del {
+  opacity: 0.6;
+}
+
+.markdown-preview .task-item {
+  list-style: none;
+  margin-left: -20px;
+}
+
+.markdown-preview .task-item input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--accent);
+}
+
 .markdown-preview a,
 .wiki-link {
   color: var(--link);
