@@ -754,6 +754,7 @@ div.tree-row.active {
 }
 
 .fmt-button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -783,6 +784,13 @@ div.tree-row.active {
   stroke-linecap: round;
 }
 
+.fmt-button svg text {
+  fill: currentColor;
+  stroke: none;
+  font-size: 6px;
+  font-weight: 700;
+}
+
 .fmt-button:hover {
   background: var(--tree-hover);
   color: var(--ink);
@@ -793,6 +801,38 @@ div.tree-row.active {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.fmt-button[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  z-index: 60;
+  width: max-content;
+  max-width: 160px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 650;
+  font-style: normal;
+  text-decoration: none;
+  line-height: 1;
+  opacity: 0;
+  padding: 6px 7px;
+  pointer-events: none;
+  transform: translate(-50%, -2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.fmt-button[data-tooltip]:hover::after,
+.fmt-button[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .fmt-divider {

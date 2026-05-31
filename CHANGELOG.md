@@ -2,6 +2,13 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.36] - 2026-05-31
+
+- Formatting bar: numbered list toggle for ordered Markdown lists
+- Formatting bar: table button inserts a 3x3 Markdown table placeholder
+- Preview context menu: copy links from rendered preview content
+- Fix: SonarQube maintainability cleanup in preview context-menu URL handling
+
 ## [0.1.35] - 2026-05-31
 
 - Print current preview via File › Print... (`Cmd+P`) or the preview pane print icon

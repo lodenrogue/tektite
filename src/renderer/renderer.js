@@ -151,8 +151,10 @@ const els = {
   fmtH4: document.getElementById("fmtH4"),
   fmtSeparator: document.getElementById("fmtSeparator"),
   fmtList: document.getElementById("fmtList"),
+  fmtOrderedList: document.getElementById("fmtOrderedList"),
   fmtLink: document.getElementById("fmtLink"),
   fmtImage: document.getElementById("fmtImage"),
+  fmtTable: document.getElementById("fmtTable"),
   findBar: document.getElementById("findBar"),
   findInput: document.getElementById("findInput"),
   findCount: document.getElementById("findCount"),
@@ -195,6 +197,7 @@ function boot() {
   els.fileTree.addEventListener("click", closeTreeContextMenu);
   els.fileTree.addEventListener("keydown", onTreeKeydown);
   els.preview.addEventListener("click", onPreviewClick);
+  els.preview.addEventListener("contextmenu", onPreviewContextMenu);
   els.previewPrintButton.addEventListener("click", printCurrentPreview);
   els.previewBackButton.addEventListener("click", goBackPreviewHistory);
   els.previewForwardButton.addEventListener("click", goForwardPreviewHistory);
@@ -253,9 +256,11 @@ function boot() {
   els.fmtH3.addEventListener("click", () => toggleHeading(3));
   els.fmtH4.addEventListener("click", () => toggleHeading(4));
   els.fmtSeparator.addEventListener("click", insertSeparator);
-  els.fmtList.addEventListener("click", toggleListOnLines);
+  els.fmtList.addEventListener("click", () => toggleListOnLines("ul"));
+  els.fmtOrderedList.addEventListener("click", () => toggleListOnLines("ol"));
   els.fmtLink.addEventListener("click", () => insertMarkdownLink(false));
   els.fmtImage.addEventListener("click", () => insertMarkdownLink(true));
+  els.fmtTable.addEventListener("click", insertTable);
   els.editor.addEventListener("scroll", syncFindOverlayScroll);
   els.settingsButton.addEventListener("click", openSettingsDialog);
   els.settingsForm.addEventListener("submit", onSettingsSubmit);
@@ -1836,7 +1841,28 @@ function insertMarkdownLink(isImage) {
   onEditorInput();
 }
 
-function toggleListOnLines() {
+function insertTable() {
+  const value = els.editor.value;
+  const start = els.editor.selectionStart;
+  const end = els.editor.selectionEnd;
+  const table = [
+    "| Column 1 | Column 2 | Column 3 |",
+    "| --- | --- | --- |",
+    "| Cell 1 | Cell 2 | Cell 3 |",
+    "| Cell 4 | Cell 5 | Cell 6 |",
+    "| Cell 7 | Cell 8 | Cell 9 |"
+  ].join("\n");
+  const prefix = start > 0 && value[start - 1] !== "\n" ? "\n\n" : "";
+  const suffix = value[end] && value[end] !== "\n" ? "\n\n" : "\n";
+  const insert = `${prefix}${table}${suffix}`;
+
+  els.editor.value = value.substring(0, start) + insert + value.substring(end);
+  els.editor.selectionStart = start + prefix.length;
+  els.editor.selectionEnd = start + prefix.length + table.length;
+  onEditorInput();
+}
+
+function toggleListOnLines(kind = "ul") {
   const value = els.editor.value;
   const start = els.editor.selectionStart;
   const end = els.editor.selectionEnd;
@@ -1844,10 +1870,15 @@ function toggleListOnLines() {
   const lineEnd = value.indexOf("\n", end === start ? end : end - 1);
   const blockEnd = lineEnd === -1 ? value.length : lineEnd;
   const lines = value.substring(lineStart, blockEnd).split("\n");
-  const allList = lines.every((l) => l.trim() === "" || l.startsWith("- "));
+  const isOrdered = kind === "ol";
+  const listPattern = isOrdered ? /^\d+\.\s+/ : /^[-*+]\s+/;
+  const allList = lines.every((l) => l.trim() === "" || listPattern.test(l));
   const toggled = allList
-    ? lines.map((l) => l.startsWith("- ") ? l.slice(2) : l).join("\n")
-    : lines.map((l) => l.trim() === "" ? l : `- ${l}`).join("\n");
+    ? lines.map((l) => l.replace(listPattern, "")).join("\n")
+    : lines.map((l, index) => {
+      if (l.trim() === "") return l;
+      return isOrdered ? `${index + 1}. ${l.replace(/^[-*+]\s+/, "")}` : `- ${l.replace(/^\d+\.\s+/, "")}`;
+    }).join("\n");
   els.editor.value = value.substring(0, lineStart) + toggled + value.substring(blockEnd);
   els.editor.selectionStart = lineStart;
   els.editor.selectionEnd = lineStart + toggled.length;
@@ -1877,7 +1908,7 @@ function onEditorKeydown(event) {
 
   if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "Digit8") {
     event.preventDefault();
-    toggleListOnLines();
+    toggleListOnLines("ul");
     return;
   }
 
@@ -2405,6 +2436,10 @@ function openTreeContextMenu(x, y, context) {
     );
   }
 
+  showContextMenu(x, y, items);
+}
+
+function showContextMenu(x, y, items) {
   els.treeContextMenu.innerHTML = "";
   for (const item of items) {
     if (item.type === "separator") {
@@ -2568,7 +2603,7 @@ async function printCurrentPreview() {
       html: els.preview.innerHTML
     });
 
-    if (result && result.ok === false && result.error && result.error !== "Print canceled.") {
+    if (result?.ok === false && result.error && result.error !== "Print canceled.") {
       console.error("[tektite:renderer] print failed", result.error);
     }
   } catch (error) {
@@ -3286,6 +3321,32 @@ function applyGraphViewport(element) {
     "transform",
     `translate(${state.graphViewport.x} ${state.graphViewport.y}) scale(${state.graphViewport.scale})`
   );
+}
+
+function onPreviewContextMenu(event) {
+  const link = event.target.closest("a");
+  const img = !link && event.target.closest("img");
+  let url = null;
+
+  if (link) {
+    const notePath = link.dataset.notePath;
+    if (notePath && state.rootPath) {
+      const noteFilePath = `${state.rootPath}/${notePath}`;
+      url = `file://${encodeURI(noteFilePath).replaceAll("%2F", "/")}`;
+    } else {
+      const href = link.getAttribute("href");
+      if (href && href !== "#") url = href;
+    }
+  } else if (img) {
+    const src = img.getAttribute("src");
+    if (src) url = src;
+  }
+
+  if (!url) return;
+  event.preventDefault();
+  showContextMenu(event.clientX, event.clientY, [
+    { label: "Copy link", action: () => navigator.clipboard.writeText(url) }
+  ]);
 }
 
 function onPreviewClick(event) {
