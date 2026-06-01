@@ -2,6 +2,14 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.37] - 2026-06-01
+
+- Editor: paste clipboard images directly into notes, saved beside the current node and inserted as Markdown image links
+- Preview: reload now refreshes local image state, and missing images render as a broken-image placeholder
+- Editor shortcuts: `Cmd+B` / `Cmd+I` toggle bold/italic on selected text
+- Formatting bar: superscript button and `^text^` preview rendering
+- File tree context menu: `Move...` dialog with indented folder picker
+
 ## [0.1.36] - 2026-05-31
 
 - Formatting bar: numbered list toggle for ordered Markdown lists

@@ -954,6 +954,28 @@ ipcMain.handle("asset:import-image", async (_event, rootPath, sourcePath, target
   };
 });
 
+ipcMain.handle("asset:save-clipboard-image", async (_event, rootPath, targetFolder = "", image = {}) => {
+  log("asset:save-clipboard-image", { targetFolder, name: image.name, mimeType: image.mimeType });
+  const dataUrl = typeof image.dataUrl === "string" ? image.dataUrl : "";
+  const match = dataUrl.match(/^data:(image\/[a-z0-9+.-]+);base64,([a-z0-9+/=]+)$/i);
+  if (!match) throw new Error("Clipboard image data is invalid.");
+
+  const mimeType = match[1].toLowerCase();
+  const extension = clipboardImageExtension(mimeType, image.name);
+  if (!imageExtensions.has(extension)) throw new Error("Clipboard image type is not supported.");
+
+  const baseFolder = normalizeRelative(targetFolder);
+  const candidate = await clipboardImageCandidate(rootPath, baseFolder, image.name, extension);
+  const destinationPath = resolveVaultPath(rootPath, candidate);
+  await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+  await fs.writeFile(destinationPath, Buffer.from(match[2], "base64"));
+  return {
+    path: candidate,
+    name: path.basename(candidate),
+    label: path.basename(candidate, path.extname(candidate))
+  };
+});
+
 ipcMain.handle("asset:read-data-url", async (_event, rootPath, relativePath) => {
   log("asset:read-data-url", relativePath);
   const filePath = resolveVaultPath(rootPath, relativePath);
@@ -1388,6 +1410,64 @@ function imageMimeType(extension) {
     default:
       return "image/png";
   }
+}
+
+function clipboardImageExtension(mimeType, requestedName = "") {
+  const requestedExtension = path.extname(requestedName).toLowerCase();
+  if (imageExtensions.has(requestedExtension)) return requestedExtension;
+  switch (mimeType) {
+    case "image/jpeg":
+      return ".jpg";
+    case "image/gif":
+      return ".gif";
+    case "image/webp":
+      return ".webp";
+    case "image/svg+xml":
+      return ".svg";
+    case "image/avif":
+      return ".avif";
+    default:
+      return ".png";
+  }
+}
+
+async function clipboardImageCandidate(rootPath, baseFolder, requestedName, extension) {
+  if (hasOriginalClipboardName(requestedName)) {
+    const parsed = path.parse(requestedName);
+    const sourceName = sanitizeEntryName(parsed.name, "image");
+    return uniqueOriginalAssetPath(rootPath, baseFolder, sourceName, extension);
+  }
+
+  const date = new Date();
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return uniqueGeneratedAssetPath(rootPath, baseFolder, `image-${yyyy}${mm}${dd}`, extension);
+}
+
+function hasOriginalClipboardName(value) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  return !/^image\.(png|jpe?g|gif|webp|svg|avif)$/i.test(value.trim());
+}
+
+async function uniqueOriginalAssetPath(rootPath, baseFolder, baseName, extension) {
+  let candidate = path.posix.join(baseFolder, `${baseName}${extension}`);
+  let index = 2;
+  while (await exists(path.join(rootPath, candidate))) {
+    candidate = path.posix.join(baseFolder, `${baseName} ${index}${extension}`);
+    index += 1;
+  }
+  return candidate;
+}
+
+async function uniqueGeneratedAssetPath(rootPath, baseFolder, baseName, extension) {
+  let index = 1;
+  let candidate = path.posix.join(baseFolder, `${baseName}-${index}${extension}`);
+  while (await exists(path.join(rootPath, candidate))) {
+    index += 1;
+    candidate = path.posix.join(baseFolder, `${baseName}-${index}${extension}`);
+  }
+  return candidate;
 }
 
 function sanitizeEntryName(value, fallback) {

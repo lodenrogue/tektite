@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("entry:move", rootPath, relativePath, type, targetFolder),
   importImage: (rootPath, sourcePath, targetFolder) =>
     ipcRenderer.invoke("asset:import-image", rootPath, sourcePath, targetFolder),
+  saveClipboardImage: (rootPath, targetFolder, image) =>
+    ipcRenderer.invoke("asset:save-clipboard-image", rootPath, targetFolder, image),
   readAssetDataUrl: (rootPath, relativePath) =>
     ipcRenderer.invoke("asset:read-data-url", rootPath, relativePath),
   setVaultWindowTitle: (vaultName) => ipcRenderer.invoke("window:set-vault-name", vaultName),

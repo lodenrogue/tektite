@@ -9,6 +9,7 @@ const state = {
   activePath: null,
   activeType: null,
   activeContent: "",
+  previewRevision: 0,
   openTabs: [],
   selectedPath: "",
   selectedType: "folder",
@@ -57,6 +58,7 @@ const state = {
     index: -1,
     restoring: false
   },
+  moveDialogResolve: null,
   find: {
     active: false,
     matches: [],
@@ -130,6 +132,12 @@ const els = {
   cancelNameXButton: document.getElementById("cancelNameXButton"),
   templateRow: document.getElementById("templateRow"),
   templateSelect: document.getElementById("templateSelect"),
+  moveDialog: document.getElementById("moveDialog"),
+  moveDialogTitle: document.getElementById("moveDialogTitle"),
+  moveForm: document.getElementById("moveForm"),
+  moveFolderSelect: document.getElementById("moveFolderSelect"),
+  cancelMoveButton: document.getElementById("cancelMoveButton"),
+  cancelMoveXButton: document.getElementById("cancelMoveXButton"),
   settingsButton: document.getElementById("settingsButton"),
   settingsDialog: document.getElementById("settingsDialog"),
   settingsForm: document.getElementById("settingsForm"),
@@ -145,6 +153,7 @@ const els = {
   fmtBold: document.getElementById("fmtBold"),
   fmtItalic: document.getElementById("fmtItalic"),
   fmtStrike: document.getElementById("fmtStrike"),
+  fmtSup: document.getElementById("fmtSup"),
   fmtH1: document.getElementById("fmtH1"),
   fmtH2: document.getElementById("fmtH2"),
   fmtH3: document.getElementById("fmtH3"),
@@ -188,6 +197,7 @@ function boot() {
   els.editor.addEventListener("keydown", onEditorKeydown);
   els.editor.addEventListener("click", updateMentionMenu);
   els.editor.addEventListener("scroll", positionMentionMenu);
+  els.editor.addEventListener("paste", onEditorPaste);
   els.editor.addEventListener("dragover", onEditorDragOver);
   els.editor.addEventListener("drop", onEditorDrop);
   els.fileTree.addEventListener("dragstart", onTreeDragStart);
@@ -215,6 +225,12 @@ function boot() {
   els.cancelNameXButton.addEventListener("click", () => closeNameDialog(null));
   els.nameDialog.addEventListener("click", (event) => {
     if (event.target === els.nameDialog) closeNameDialog(null);
+  });
+  els.moveForm.addEventListener("submit", onMoveSubmit);
+  els.cancelMoveButton.addEventListener("click", () => closeMoveDialog(null));
+  els.cancelMoveXButton.addEventListener("click", () => closeMoveDialog(null));
+  els.moveDialog.addEventListener("click", (event) => {
+    if (event.target === els.moveDialog) closeMoveDialog(null);
   });
   els.closeGitOutputButton.addEventListener("click", closeGitOutputDialog);
   els.closeGitOutputXButton.addEventListener("click", closeGitOutputDialog);
@@ -251,6 +267,7 @@ function boot() {
   els.fmtBold.addEventListener("click", () => toggleInlineFormat("**", "**", "bold text"));
   els.fmtItalic.addEventListener("click", () => toggleInlineFormat("*", "*", "italic text"));
   els.fmtStrike.addEventListener("click", () => toggleInlineFormat("~~", "~~", "strikethrough"));
+  els.fmtSup.addEventListener("click", () => toggleInlineFormat("^", "^", "superscript"));
   els.fmtH1.addEventListener("click", () => toggleHeading(1));
   els.fmtH2.addEventListener("click", () => toggleHeading(2));
   els.fmtH3.addEventListener("click", () => toggleHeading(3));
@@ -721,6 +738,7 @@ async function openVault(rootPath) {
     state.rootPath = vault.rootPath;
     state.tree = vault.tree;
     state.notes = vault.notes;
+    state.previewRevision = Date.now();
     state.hasGitRepo = Boolean(vault.hasGitRepo);
     state.gitProvider = vault.gitProvider || null;
     globalThis.tektite.loadSettings(state.rootPath)
@@ -779,6 +797,7 @@ async function refreshVault(options = {}) {
   }
   state.tree = vault.tree;
   state.notes = vault.notes;
+  state.previewRevision = Date.now();
   state.hasGitRepo = Boolean(vault.hasGitRepo);
   state.gitProvider = vault.gitProvider || null;
   indexNotes();
@@ -994,6 +1013,65 @@ function closeNameDialog(value) {
   resolve(value);
 }
 
+function openMoveDialog(context) {
+  const folders = moveFolderOptions(context);
+  if (!folders.length) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    state.moveDialogResolve = resolve;
+    const label = context.type === "folder" ? "folder" : "file";
+    els.moveDialogTitle.textContent = `Move ${label}`;
+    els.moveFolderSelect.innerHTML = "";
+    for (const folder of folders) {
+      const option = document.createElement("option");
+      option.value = folder.path;
+      option.textContent = `${"\u00a0\u00a0".repeat(folder.depth)}${folder.label}`;
+      els.moveFolderSelect.appendChild(option);
+    }
+
+    const currentFolder = parentFolder(context.path);
+    const preferred = folders.find((folder) => folder.path !== currentFolder) || folders[0];
+    els.moveFolderSelect.value = preferred.path;
+    els.moveDialog.setAttribute("open", "");
+    els.moveDialog.classList.remove("hidden");
+    els.moveFolderSelect.focus();
+  });
+}
+
+function onMoveSubmit(event) {
+  event.preventDefault();
+  closeMoveDialog(els.moveFolderSelect.value);
+}
+
+function closeMoveDialog(value) {
+  if (!state.moveDialogResolve) return;
+  els.moveDialog.classList.add("hidden");
+  els.moveDialog.removeAttribute("open");
+  const resolve = state.moveDialogResolve;
+  state.moveDialogResolve = null;
+  resolve(value);
+}
+
+function moveFolderOptions(context) {
+  if (!state.tree) return [];
+  return flattenFoldersForMove(state.tree, context).filter((folder) => canMoveTreeEntry(context, folder.path));
+}
+
+function flattenFoldersForMove(node, context, depth = 0) {
+  if (node?.type !== "folder") return [];
+  const label = node.path ? node.name : `${state.tree.name || "Vault"} /`;
+  const folders = [{ path: node.path || "", label, depth }];
+  const children = Array.isArray(node.children) ? node.children : [];
+  const childFolders = children
+    .filter((child) => child.type === "folder")
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  for (const child of childFolders) {
+    if (context.type === "folder" && child.path === context.path) continue;
+    folders.push(...flattenFoldersForMove(child, context, depth + 1));
+  }
+  return folders;
+}
+
 function updateMentionMenu() {
   if (state.activeType !== "note" || !state.activePath || document.activeElement !== els.editor) {
     closeMentionMenu();
@@ -1137,6 +1215,58 @@ function mentionDefaultName() {
   return state.mention.query.trim() || "Untitled";
 }
 
+async function onEditorPaste(event) {
+  if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
+  const images = clipboardImageFiles(event.clipboardData);
+  if (!images.length) return;
+  event.preventDefault();
+
+  try {
+    const imported = [];
+    for (const file of images) {
+      const dataUrl = await readFileAsDataUrl(file);
+      imported.push(await globalThis.tektite.saveClipboardImage(state.rootPath, activeFolder(), {
+        name: clipboardImageName(file),
+        mimeType: file.type,
+        dataUrl
+      }));
+    }
+    await refreshVault({ flush: false });
+    insertImportedImages(imported);
+    await saveActiveNote();
+  } catch (error) {
+    console.error("[tektite:renderer] image paste into editor failed", error);
+    setSaveState("Failed");
+  }
+}
+
+function clipboardImageFiles(clipboardData) {
+  if (!clipboardData) return [];
+  const itemFiles = Array.from(clipboardData.items)
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  if (itemFiles.length) return itemFiles;
+  return Array.from(clipboardData.files).filter((file) => file.type.startsWith("image/") || isImagePath(file.name));
+}
+
+function clipboardImageName(file) {
+  const name = file?.name || "";
+  return /^image\.(png|jpe?g|gif|webp|svg|avif)$/i.test(name) ? "" : name;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Clipboard image data is invalid."));
+    });
+    reader.addEventListener("error", () => reject(reader.error || new Error("Could not read clipboard image.")));
+    reader.readAsDataURL(file);
+  });
+}
+
 function onEditorDragOver(event) {
   if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
   const hasInternalEntry = event.dataTransfer.types.includes("application/x-tektite-entry");
@@ -1168,16 +1298,21 @@ async function onEditorDrop(event) {
     }
     if (!imported.length) return;
 
-    const markdown = imported
-      .map((image) => `![${image.label}](${relativeMarkdownLink(state.activePath, image.path)})`)
-      .join("\n");
-    const insertion = markdown.endsWith("\n") ? markdown : `${markdown}\n`;
-    insertEditorMarkdown(insertion, event);
+    await refreshVault({ flush: false });
+    insertImportedImages(imported, event);
     await saveActiveNote();
   } catch (error) {
     console.error("[tektite:renderer] image drop into editor failed", error);
     setSaveState("Failed");
   }
+}
+
+function insertImportedImages(images, event) {
+  if (!images.length) return;
+  const markdown = images
+    .map((image) => `![${image.label}](${relativeMarkdownLink(state.activePath, image.path)})`)
+    .join("\n");
+  insertEditorMarkdown(markdown, event);
 }
 
 function insertDroppedEntryLink(payload, event) {
@@ -1197,9 +1332,11 @@ function markdownForEntry(entry) {
 }
 
 function insertEditorMarkdown(markdown, event) {
-  const position = getTextareaPositionFromPoint(els.editor, event.clientX, event.clientY);
   els.editor.focus();
-  els.editor.setSelectionRange(position, position);
+  if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+    const position = getTextareaPositionFromPoint(els.editor, event.clientX, event.clientY);
+    els.editor.setSelectionRange(position, position);
+  }
 
   const insertion = markdown.endsWith("\n") ? markdown : `${markdown}\n`;
   els.editor.setRangeText(insertion, els.editor.selectionStart, els.editor.selectionEnd, "end");
@@ -1273,6 +1410,14 @@ async function moveTreeEntry(payload, targetFolderPath) {
     console.error("[tektite:renderer] moveTreeEntry failed", error);
     setSaveState("Failed");
   }
+}
+
+async function moveSelectedEntry(context = currentSelection()) {
+  if (!state.rootPath || !context?.path) return;
+  const targetFolderPath = await openMoveDialog(context);
+  if (targetFolderPath === null) return;
+  await moveTreeEntry(context, targetFolderPath);
+  els.fileTree.focus();
 }
 
 function canMoveTreeEntry(payload, targetFolderPath) {
@@ -1360,8 +1505,9 @@ function localImageUrl(target, sourcePath = "") {
   const sourceFolder = parentFolder(sourcePath);
   const relative = normalizeVaultPath(sourceFolder ? `${sourceFolder}/${clean}` : clean);
   if (!relative || !state.rootPath) return null;
+  if (!treeEntryExists(state.tree, relative, "asset")) return null;
   const absolutePath = `${state.rootPath}/${relative}`;
-  return `file://${encodeURI(absolutePath)}`;
+  return `file://${encodeURI(absolutePath)}?v=${state.previewRevision}`;
 }
 
 function relativePath(fromFolder, toPath) {
@@ -1905,7 +2051,9 @@ function indentSelectedLines() {
 
 function onEditorKeydown(event) {
   if (onFindBarKeydown(event)) return;
+  if (onInlineFormatShortcut(event)) return;
 
+  const key = event.key.toLowerCase();
   if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.code === "Digit8") {
     event.preventDefault();
     toggleListOnLines("ul");
@@ -1918,7 +2066,6 @@ function onEditorKeydown(event) {
     return;
   }
 
-  const key = event.key.toLowerCase();
   if ((event.metaKey || event.ctrlKey) && key === "z") {
     event.preventDefault();
     restoreEditorHistory(event.shiftKey ? 1 : -1);
@@ -1931,6 +2078,28 @@ function onEditorKeydown(event) {
   }
 
   if (state.mention.active) onMentionMenuKeydown(event);
+}
+
+function onInlineFormatShortcut(event) {
+  if (!(event.metaKey || event.ctrlKey) || event.shiftKey || !hasEditorSelection()) return false;
+  const key = event.key.toLowerCase();
+  if (key === "b") {
+    event.preventDefault();
+    toggleInlineFormat("**", "**", "bold text");
+    return true;
+  }
+  if (key === "i") {
+    event.preventDefault();
+    toggleInlineFormat("*", "*", "italic text");
+    return true;
+  }
+  return false;
+}
+
+function hasEditorSelection() {
+  return state.activeType === "note" &&
+    document.activeElement === els.editor &&
+    els.editor.selectionStart !== els.editor.selectionEnd;
 }
 
 function onMentionMenuKeydown(event) {
@@ -2044,6 +2213,7 @@ function clearGitOutputSubscription() {
 function onGlobalEscape() {
   closeTreeContextMenu();
   if (!els.nameDialog.classList.contains("hidden")) closeNameDialog(null);
+  if (!els.moveDialog.classList.contains("hidden")) closeMoveDialog(null);
   if (!els.gitOutputDialog.classList.contains("hidden")) closeGitOutputDialog();
   if (!els.settingsDialog.classList.contains("hidden")) closeSettingsDialog();
   if (state.find.active) closeFindBar();
@@ -2428,6 +2598,10 @@ function openTreeContextMenu(x, y, context) {
         action: () => renameSelectedEntry(context)
       },
       {
+        label: "Move...",
+        action: () => moveSelectedEntry(context)
+      },
+      {
         label: isFolder ? "Delete folder" : "Delete file",
         shortcut: "⌘⌫",
         danger: true,
@@ -2765,6 +2939,11 @@ function appendMarkdownQuote(context, quote) {
   context.blocks.push(`<blockquote>${inlineMarkdown(quote, context.sourcePath)}</blockquote>`);
 }
 
+function brokenImageHtml(alt, href) {
+  const label = alt || href || "Missing image";
+  return `<span class="broken-image" title="${escapeAttr(href)}"><span aria-hidden="true">▧</span>${escapeHtml(label)}</span>`;
+}
+
 function inlineMarkdown(value, sourcePath = "") {
   const tokens = [];
   let text = escapeHtml(value);
@@ -2780,7 +2959,7 @@ function inlineMarkdown(value, sourcePath = "") {
       tokens,
       imageUrl
         ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(alt)}">`
-        : `<span>${alt}</span>`
+        : brokenImageHtml(alt, href)
     );
     return token;
   });
@@ -2817,6 +2996,7 @@ function inlineMarkdown(value, sourcePath = "") {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/\^([^^\s][^^]*)\^/g, "<sup>$1</sup>")
     .replace(/:([a-z0-9_+-]+):/g, (_m, name) => emojiChar(name) || _m);
 
   return restore(tokens, text);

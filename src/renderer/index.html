@@ -114,6 +114,7 @@
             <button type="button" class="fmt-button fmt-button--bold" id="fmtBold" data-tooltip="Bold (⌘B)" aria-label="Bold">B</button>
             <button type="button" class="fmt-button fmt-button--italic" id="fmtItalic" data-tooltip="Italic (⌘I)" aria-label="Italic">I</button>
             <button type="button" class="fmt-button fmt-button--strike" id="fmtStrike" data-tooltip="Strikethrough" aria-label="Strikethrough">S</button>
+            <button type="button" class="fmt-button fmt-button--sup" id="fmtSup" data-tooltip="Superscript" aria-label="Superscript">x²</button>
             <div class="fmt-divider" aria-hidden="true"></div>
             <button type="button" class="fmt-button" id="fmtH1" data-tooltip="Heading 1" aria-label="Heading 1">H1</button>
             <button type="button" class="fmt-button" id="fmtH2" data-tooltip="Heading 2" aria-label="Heading 2">H2</button>
@@ -200,6 +201,21 @@
         <footer class="modal-actions">
           <button id="cancelNameButton" class="secondary-button" type="button">Cancel</button>
           <button id="confirmNameButton" class="primary-button" type="submit">Create</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="moveDialog" class="modal-backdrop hidden" aria-labelledby="moveDialogTitle">
+      <form id="moveForm" class="modal">
+        <header class="modal-header">
+          <h2 id="moveDialogTitle">Move</h2>
+          <button id="cancelMoveXButton" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+        <label class="field-label" for="moveFolderSelect">Destination folder</label>
+        <select id="moveFolderSelect" class="modal-select"></select>
+        <footer class="modal-actions">
+          <button id="cancelMoveButton" class="secondary-button" type="button">Cancel</button>
+          <button id="confirmMoveButton" class="primary-button" type="submit">Move</button>
         </footer>
       </form>
     </dialog>

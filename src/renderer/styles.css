@@ -774,6 +774,7 @@ div.tree-row.active {
 .fmt-button--bold { font-weight: 800; }
 .fmt-button--italic { font-style: italic; font-weight: 600; }
 .fmt-button--strike { text-decoration: line-through; }
+.fmt-button--sup { font-size: 11px; }
 
 .fmt-button svg {
   width: 15px;
@@ -1194,6 +1195,24 @@ div.tree-row.active {
   height: auto;
   border-radius: 6px;
   margin: 0 0 16px;
+}
+
+.broken-image {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed var(--danger);
+  border-radius: 6px;
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.broken-image span {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .graph-view {
