@@ -804,10 +804,12 @@ ipcMain.handle("settings:load", async (_event, rootPath) => {
     const parsed = JSON.parse(raw);
     return {
       templatesPath: typeof parsed.templatesPath === "string" ? parsed.templatesPath : "",
-      autoLinkUrls: Boolean(parsed.autoLinkUrls)
+      autoLinkUrls: Boolean(parsed.autoLinkUrls),
+      tocListStyle: parsed.tocListStyle === "ordered" ? "ordered" : "unordered",
+      tocIncludeSubfolders: Boolean(parsed.tocIncludeSubfolders)
     };
   } catch {
-    return { templatesPath: "" };
+    return { templatesPath: "", autoLinkUrls: false, tocListStyle: "unordered", tocIncludeSubfolders: false };
   }
 });
 

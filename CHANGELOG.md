@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.38] - 2026-06-02
+
+- Table of Contents macro: insert linked note lists for the current folder from the formatting bar or `@` menu
+- Settings: configure TOC macro as ordered/unordered list and optionally include subfolders
+
 ## [0.1.37] - 2026-06-01
 
 - Editor: paste clipboard images directly into notes, saved beside the current node and inserted as Markdown image links

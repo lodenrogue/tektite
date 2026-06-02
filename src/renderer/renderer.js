@@ -66,7 +66,9 @@ const state = {
   },
   settings: {
     templatesPath: "",
-    autoLinkUrls: false
+    autoLinkUrls: false,
+    tocListStyle: "unordered",
+    tocIncludeSubfolders: false
   }
 };
 
@@ -75,6 +77,7 @@ const FILE_TREE_MIN_HEIGHT = 56;
 const TAGS_MIN_HEIGHT = 56;
 const GRAPH_MIN_HEIGHT = 100;
 const SIDEBAR_PANE_HEADER_HEIGHT = 42;
+const MENTION_ACTION_COUNT = 2;
 
 const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
   localStorage.getItem("tektite:verbose") === "1";
@@ -143,6 +146,9 @@ const els = {
   settingsForm: document.getElementById("settingsForm"),
   templatesPathInput: document.getElementById("templatesPathInput"),
   autoLinkUrlsCheckbox: document.getElementById("autoLinkUrlsCheckbox"),
+  tocUnorderedRadio: document.getElementById("tocUnorderedRadio"),
+  tocOrderedRadio: document.getElementById("tocOrderedRadio"),
+  tocIncludeSubfoldersCheckbox: document.getElementById("tocIncludeSubfoldersCheckbox"),
   cancelSettingsButton: document.getElementById("cancelSettingsButton"),
   cancelSettingsXButton: document.getElementById("cancelSettingsXButton"),
   gitOutputDialog: document.getElementById("gitOutputDialog"),
@@ -164,6 +170,7 @@ const els = {
   fmtLink: document.getElementById("fmtLink"),
   fmtImage: document.getElementById("fmtImage"),
   fmtTable: document.getElementById("fmtTable"),
+  fmtToc: document.getElementById("fmtToc"),
   findBar: document.getElementById("findBar"),
   findInput: document.getElementById("findInput"),
   findCount: document.getElementById("findCount"),
@@ -278,6 +285,7 @@ function boot() {
   els.fmtLink.addEventListener("click", () => insertMarkdownLink(false));
   els.fmtImage.addEventListener("click", () => insertMarkdownLink(true));
   els.fmtTable.addEventListener("click", insertTable);
+  els.fmtToc.addEventListener("click", () => insertTableOfContents());
   els.editor.addEventListener("scroll", syncFindOverlayScroll);
   els.settingsButton.addEventListener("click", openSettingsDialog);
   els.settingsForm.addEventListener("submit", onSettingsSubmit);
@@ -741,9 +749,7 @@ async function openVault(rootPath) {
     state.previewRevision = Date.now();
     state.hasGitRepo = Boolean(vault.hasGitRepo);
     state.gitProvider = vault.gitProvider || null;
-    globalThis.tektite.loadSettings(state.rootPath)
-      .then((s) => { state.settings = { templatesPath: "", autoLinkUrls: false, ...s }; })
-      .catch(() => { state.settings = { templatesPath: "" }; });
+    state.settings = normalizeSettings(await globalThis.tektite.loadSettings(state.rootPath).catch(() => null));
     state.activePath = null;
     state.activeType = null;
     state.activeContent = "";
@@ -1100,7 +1106,9 @@ function updateMentionMenu() {
     active: true,
     start,
     query,
-    selectedIndex: state.mention.query === query ? Math.min(state.mention.selectedIndex, items.length) : 0,
+    selectedIndex: state.mention.query === query
+      ? Math.min(state.mention.selectedIndex, items.length + MENTION_ACTION_COUNT - 1)
+      : 0,
     items
   };
   renderMentionMenu();
@@ -1122,8 +1130,20 @@ function renderMentionMenu() {
   });
   els.mentionMenu.appendChild(newNodeOption);
 
+  const tocOption = document.createElement("button");
+  tocOption.type = "button";
+  tocOption.className = `mention-option mention-action${state.mention.selectedIndex === 1 ? " active" : ""}`;
+  tocOption.setAttribute("role", "option");
+  tocOption.setAttribute("aria-selected", String(state.mention.selectedIndex === 1));
+  tocOption.innerHTML = "<span>Table of Contents</span><small>Current folder</small>";
+  tocOption.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    insertTableOfContents({ replaceMention: true });
+  });
+  els.mentionMenu.appendChild(tocOption);
+
   state.mention.items.forEach((note, index) => {
-    const optionIndex = index + 1;
+    const optionIndex = index + MENTION_ACTION_COUNT;
     const option = document.createElement("button");
     option.type = "button";
     option.className = `mention-option${optionIndex === state.mention.selectedIndex ? " active" : ""}`;
@@ -1338,8 +1358,13 @@ function insertEditorMarkdown(markdown, event) {
     els.editor.setSelectionRange(position, position);
   }
 
+  insertMarkdownAtRange(markdown, els.editor.selectionStart, els.editor.selectionEnd);
+}
+
+function insertMarkdownAtRange(markdown, start, end) {
+  els.editor.focus();
   const insertion = markdown.endsWith("\n") ? markdown : `${markdown}\n`;
-  els.editor.setRangeText(insertion, els.editor.selectionStart, els.editor.selectionEnd, "end");
+  els.editor.setRangeText(insertion, start, end, "end");
   state.activeContent = els.editor.value;
   renderPreview(state.activeContent);
   updateGraph();
@@ -2008,6 +2033,77 @@ function insertTable() {
   onEditorInput();
 }
 
+function insertTableOfContents(options = {}) {
+  if (state.activeType !== "note" || !state.activePath) return;
+  const markdown = tableOfContentsMarkdown();
+  if (!markdown) return;
+
+  if (options.replaceMention && state.mention.active) {
+    const rangeStart = state.mention.start;
+    const rangeEnd = els.editor.selectionStart;
+    closeMentionMenu();
+    insertMarkdownAtRange(markdown, rangeStart, rangeEnd);
+    return;
+  }
+
+  insertEditorMarkdown(markdown);
+}
+
+function tableOfContentsMarkdown() {
+  const folderPath = activeFolder();
+  const folderNode = folderPath ? findTreeNode(state.tree, folderPath) : state.tree;
+  if (!folderNode) return "";
+  const includeSubfolders = Boolean(state.settings.tocIncludeSubfolders);
+  const lines = tocLinesForFolder(folderNode, 0, includeSubfolders);
+  return lines.join("\n");
+}
+
+function tocLinesForFolder(folderNode, depth, includeSubfolders) {
+  const lines = tocNoteLines(folderNode, depth);
+  if (!includeSubfolders) return lines;
+  for (const folder of sortedChildFolders(folderNode)) {
+    const childLines = tocLinesForFolder(folder, depth + 1, true);
+    if (!childLines.length) continue;
+    lines.push(tocFolderLine(folder, depth, lines.length), ...childLines);
+  }
+  return lines;
+}
+
+function tocNoteLines(folderNode, depth) {
+  return sortedChildNotes(folderNode).map((note, index) => {
+    const label = state.showFileExtensions ? note.name : note.title;
+    const link = relativeMarkdownLink(state.activePath, note.path);
+    return `${tocIndent(depth)}${tocMarker(index)} [${label}](${link})`;
+  });
+}
+
+function tocFolderLine(folder, depth, index) {
+  return `${tocIndent(depth)}${tocMarker(index)} ${folder.name}`;
+}
+
+function tocMarker(index) {
+  return state.settings.tocListStyle === "ordered" ? `${index + 1}.` : "-";
+}
+
+function tocIndent(depth) {
+  return "  ".repeat(depth);
+}
+
+function sortedChildNotes(folderNode) {
+  return childNodesOfType(folderNode, "note")
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+function sortedChildFolders(folderNode) {
+  return childNodesOfType(folderNode, "folder")
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+function childNodesOfType(folderNode, type) {
+  const children = Array.isArray(folderNode?.children) ? folderNode.children : [];
+  return children.filter((child) => child.type === type);
+}
+
 function toggleListOnLines(kind = "ul") {
   const value = els.editor.value;
   const start = els.editor.selectionStart;
@@ -2105,7 +2201,10 @@ function hasEditorSelection() {
 function onMentionMenuKeydown(event) {
   if (event.key === "ArrowDown") {
     event.preventDefault();
-    state.mention.selectedIndex = Math.min(state.mention.selectedIndex + 1, state.mention.items.length);
+    state.mention.selectedIndex = Math.min(
+      state.mention.selectedIndex + 1,
+      state.mention.items.length + MENTION_ACTION_COUNT - 1
+    );
     renderMentionMenu();
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
@@ -2114,7 +2213,8 @@ function onMentionMenuKeydown(event) {
   } else if (event.key === "Enter" || event.key === "Tab") {
     event.preventDefault();
     if (state.mention.selectedIndex === 0) createMentionNode();
-    else insertMentionLink(state.mention.items[state.mention.selectedIndex - 1]);
+    else if (state.mention.selectedIndex === 1) insertTableOfContents({ replaceMention: true });
+    else insertMentionLink(state.mention.items[state.mention.selectedIndex - MENTION_ACTION_COUNT]);
   } else if (event.key === "Escape") {
     event.preventDefault();
     closeMentionMenu();
@@ -2225,8 +2325,12 @@ function closeGitOutputDialog() {
 }
 
 function openSettingsDialog() {
+  state.settings = normalizeSettings(state.settings);
   els.templatesPathInput.value = state.settings.templatesPath || "";
   els.autoLinkUrlsCheckbox.checked = Boolean(state.settings.autoLinkUrls);
+  els.tocOrderedRadio.checked = state.settings.tocListStyle === "ordered";
+  els.tocUnorderedRadio.checked = state.settings.tocListStyle !== "ordered";
+  els.tocIncludeSubfoldersCheckbox.checked = Boolean(state.settings.tocIncludeSubfolders);
   els.settingsDialog.setAttribute("open", "");
   els.settingsDialog.classList.remove("hidden");
   requestAnimationFrame(() => els.templatesPathInput.focus());
@@ -2241,11 +2345,23 @@ async function onSettingsSubmit(event) {
   event.preventDefault();
   const templatesPath = els.templatesPathInput.value.trim();
   const autoLinkUrls = els.autoLinkUrlsCheckbox.checked;
-  state.settings = { templatesPath, autoLinkUrls };
+  const tocListStyle = els.tocOrderedRadio.checked ? "ordered" : "unordered";
+  const tocIncludeSubfolders = els.tocIncludeSubfoldersCheckbox.checked;
+  state.settings = normalizeSettings({ templatesPath, autoLinkUrls, tocListStyle, tocIncludeSubfolders });
   if (state.rootPath) {
     await globalThis.tektite.saveSettings(state.rootPath, state.settings).catch(() => {});
   }
   closeSettingsDialog();
+}
+
+function normalizeSettings(settings = {}) {
+  const source = settings && typeof settings === "object" ? settings : {};
+  return {
+    templatesPath: typeof source.templatesPath === "string" ? source.templatesPath : "",
+    autoLinkUrls: Boolean(source.autoLinkUrls),
+    tocListStyle: source.tocListStyle === "ordered" ? "ordered" : "unordered",
+    tocIncludeSubfolders: Boolean(source.tocIncludeSubfolders)
+  };
 }
 
 async function restoreWorkspaceState() {

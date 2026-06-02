@@ -1423,7 +1423,32 @@ div.tree-row.active {
   cursor: pointer;
 }
 
-.settings-checkbox-row input[type="checkbox"] {
+.settings-section {
+  margin: 16px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.settings-section legend {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 680;
+  padding: 0 4px;
+}
+
+.settings-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.settings-checkbox-row input[type="checkbox"],
+.settings-radio-row input[type="radio"] {
   accent-color: var(--accent);
   width: 15px;
   height: 15px;
