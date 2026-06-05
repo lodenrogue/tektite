@@ -28,6 +28,15 @@ All notable changes to Tektite are documented here.
 - Print uses the native system dialog, including macOS Save as PDF
 - Fix: file tree markup now matches the custom tree role expected by SonarQube accessibility checks
 
+## [0.1.38] - 2026-06-06
+
+- Open a vault by passing its path as a command-line argument: `npm start /path/to/vault` or `Tektite.app … /path/to/vault`
+- If the app is already running and the vault is already open, brings that window to front
+- If the app is already running and the vault is not open, opens it in a new window
+- If the vault path is invalid/missing, shows the same "Vault Folder Not Found" dialog as when a restored vault no longer exists
+- The arg vault window is brought to focus after all restored windows open
+- `npm start` now forwards extra arguments to the packaged binary
+
 ## [0.1.34] - 2026-05-30
 
 - Settings: "Link bare URLs in preview" checkbox — auto-links plain `https://` URLs in preview when enabled (default: off)

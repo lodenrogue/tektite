@@ -30,7 +30,8 @@ async function main() {
   console.log(`Launching ${appPath}`);
 
   if (process.env.TEKTITE_PACKAGE_ONLY === "1") return;
-  await run(path.join(appPath, "Tektite.app", "Contents", "MacOS", "Tektite"), [], root);
+  const extraArgs = process.argv.slice(2);
+  await run(path.join(appPath, "Tektite.app", "Contents", "MacOS", "Tektite"), extraArgs, root);
 }
 
 function run(command, args, cwd) {

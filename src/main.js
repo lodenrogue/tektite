@@ -70,10 +70,14 @@ function createWindow(options = {}) {
       setTimeout(() => {
         if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
         splashWindow = null;
-        if (!window.isDestroyed()) window.show();
+        if (!window.isDestroyed()) {
+          window.show();
+          if (options.focusOnShow) window.focus();
+        }
       }, Math.max(0, splashMinimumMs - elapsed));
     } else if (!shouldShowImmediately && !window.isDestroyed()) {
       window.show();
+      if (options.focusOnShow) window.focus();
     }
   });
 
@@ -520,6 +524,52 @@ function toggleMaximize(window) {
   else window.maximize();
 }
 
+function vaultArgFromArgv(argv) {
+  for (const arg of argv.slice(1)) {
+    if (arg.startsWith("-")) continue;
+    const resolved = path.resolve(arg);
+    try {
+      if (fsSync.statSync(resolved).isDirectory()) return resolved;
+    } catch {
+      // Path doesn't exist or isn't accessible — return the resolved path
+      // so the caller can show the unavailable dialog
+      return { path: resolved, invalid: true };
+    }
+  }
+  return null;
+}
+
+async function handleVaultArg(vaultPath) {
+  if (!vaultPath || typeof vaultPath !== "string") return;
+  const normalized = vaultPath;
+  // Check if already open in any window
+  for (const [win, wv] of windowVaults) {
+    if (!win.isDestroyed() && wv === normalized) {
+      focusTektiteWindow(win);
+      return;
+    }
+  }
+  // Not open — create new window with this vault
+  createWindow({ vaultPath: normalized });
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (gotSingleInstanceLock) {
+  app.on("second-instance", (_event, argv) => {
+    const result = vaultArgFromArgv(argv);
+    if (result?.invalid) {
+      showVaultUnavailableDialog(null, result.path);
+    } else if (result) {
+      handleVaultArg(result);
+    } else {
+      const win = activeTektiteWindow();
+      if (win) focusTektiteWindow(win);
+    }
+  });
+} else {
+  app.quit();
+}
+
 app.on("before-quit", () => {
   isQuitting = true;
   try {
@@ -538,20 +588,16 @@ app.on("before-quit", () => {
   }
 });
 
-app.on("ready", async () => {
-  app.setName("Tektite");
-  await loadRecentVaults();
-  buildMenu();
-  createSplashWindow();
-
+async function restoreSessions() {
   const store = await loadWorkspaceStore();
   const sessions = Array.isArray(store.sessions) && store.sessions.length > 0
     ? store.sessions.filter((v) => v === null || (typeof v === "string" && v))
     : null;
-
+  const restoredVaults = new Set();
   if (sessions) {
     for (const vaultPath of sessions) {
       if (vaultPath) {
+        restoredVaults.add(path.resolve(vaultPath));
         createWindow({ show: false, vaultPath });
       } else {
         createWindow({ show: false, restoreLastVault: false });
@@ -560,6 +606,38 @@ app.on("ready", async () => {
   } else {
     createWindow({ show: false });
   }
+  return restoredVaults;
+}
+
+function handleArgVaultAfterRestore(normalizedArgVault, invalidArgVault, restoredVaults) {
+  if (invalidArgVault) {
+    setTimeout(() => showVaultUnavailableDialog(null, invalidArgVault), splashMinimumMs + 200);
+    return;
+  }
+  if (!normalizedArgVault) return;
+  if (restoredVaults.has(normalizedArgVault)) {
+    setTimeout(() => {
+      for (const [win, wv] of windowVaults) {
+        if (!win.isDestroyed() && wv === normalizedArgVault) { focusTektiteWindow(win); break; }
+      }
+    }, 3200);
+  } else {
+    createWindow({ show: false, vaultPath: normalizedArgVault, focusOnShow: true });
+  }
+}
+
+app.on("ready", async () => {
+  app.setName("Tektite");
+  await loadRecentVaults();
+  buildMenu();
+  createSplashWindow();
+
+  const argVaultResult = vaultArgFromArgv(process.argv);
+  const normalizedArgVault = argVaultResult && !argVaultResult.invalid ? argVaultResult : null;
+  const invalidArgVault = argVaultResult?.invalid ? argVaultResult.path : null;
+
+  const restoredVaults = await restoreSessions();
+  handleArgVaultAfterRestore(normalizedArgVault, invalidArgVault, restoredVaults);
 
   app.on("activate", () => {
     if (tektiteWindows.size === 0) createWindow();
