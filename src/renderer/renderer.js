@@ -2565,7 +2565,7 @@ function renderTags() {
     button.type = "button";
     button.textContent = tag;
     button.addEventListener("click", () => {
-      els.searchInput.value = tag;
+      els.searchInput.value = els.searchInput.value == tag ? "" : tag;
       renderTree();
       els.searchInput.focus();
     });
