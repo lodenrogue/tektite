@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.41] - 2026-06-06
+
+- Fix: show "No printers configured" alert when printing with no printers available; suppress alert when user cancels the print dialog (fixes [#5](https://github.com/mathiasconradt/tektite/issues/5))
+
 ## [0.1.40] - 2026-06-06
 
 - Fix: clicking a tag in the Tags pane now correctly clears the tag filter when clicked again (community contribution)

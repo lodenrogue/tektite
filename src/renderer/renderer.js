@@ -2893,11 +2893,16 @@ async function printCurrentPreview() {
       html: els.preview.innerHTML
     });
 
-    if (result?.ok === false && result.error && result.error !== "Print canceled.") {
+    if (result?.ok === false && result.error && !/cancel/i.test(result.error)) {
       console.error("[tektite:renderer] print failed", result.error);
+      const msg = /no printer/i.test(result.error)
+        ? "No printers configured. Please add a printer in System Settings and try again."
+        : `Could not print: ${result.error}`;
+      globalThis.alert(msg);
     }
   } catch (error) {
     console.error("[tektite:renderer] print failed", error);
+    globalThis.alert("Could not print. Please try again.");
   }
 }
 
