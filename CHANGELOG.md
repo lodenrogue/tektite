@@ -2,6 +2,17 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.40] - 2026-06-06
+
+- Fix: clicking a tag in the Tags pane now correctly clears the tag filter when clicked again (community contribution)
+
+## [0.1.39] - 2026-06-06
+
+- Open a vault by passing its path as a command-line argument: `npm start /path/to/vault` or `Tektite.app … /path/to/vault`
+- If the app is already running and the vault is open, brings that window to front; otherwise opens it in a new window
+- Invalid/missing paths show the "Vault Folder Not Found" dialog
+- `npm start` now forwards extra arguments to the packaged binary
+
 ## [0.1.38] - 2026-06-02
 
 - Table of Contents macro: insert linked note lists for the current folder from the formatting bar or `@` menu
