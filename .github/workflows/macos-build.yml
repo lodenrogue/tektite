@@ -26,12 +26,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Install dependencies
-        run: |
-          echo 'registry=https://registry.npmjs.org/' > /tmp/ci-npmrc
-          npm ci --userconfig=/tmp/ci-npmrc
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ""
+          NPM_TOKEN: ""
+          npm_config_registry: "https://registry.npmjs.org/"
 
       - name: Syntax check
         run: |
