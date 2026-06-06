@@ -3210,7 +3210,11 @@ function inlineMarkdown(value, sourcePath = "") {
   });
 
   text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, href) => {
-    const imageUrl = localImageUrl(href, sourcePath);
+    const decoded = decodeLink(href);
+    const isRemote = /^https?:\/\//i.test(decoded);
+    const imageUrl = isRemote
+      ? decoded.replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"')
+      : localImageUrl(href, sourcePath);
     const token = stash(
       tokens,
       imageUrl
