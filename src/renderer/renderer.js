@@ -129,6 +129,7 @@ const els = {
   workspaceResizer: document.getElementById("workspaceResizer"),
   sidebarGraphResizer: document.getElementById("sidebarGraphResizer"),
   treeContextMenu: document.getElementById("treeContextMenu"),
+  tabContextMenu: document.getElementById("tabContextMenu"),
   nameDialog: document.getElementById("nameDialog"),
   nameForm: document.getElementById("nameForm"),
   nameDialogTitle: document.getElementById("nameDialogTitle"),
@@ -325,6 +326,7 @@ function boot() {
   els.findCloseButton.addEventListener("click", closeFindBar);
   globalThis.addEventListener("click", (event) => {
     if (!event.target.closest?.("#treeContextMenu")) closeTreeContextMenu();
+    if (!event.target.closest?.("#tabContextMenu")) closeTabContextMenu?.();
   });
   globalThis.addEventListener("resize", () => {
     applyLayout();
@@ -1981,6 +1983,11 @@ function renderEditorTabs() {
       }
       activateTab(tab.path, tab.type);
     });
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onTabContextMenu(event, tab.path, tab.type);
+    });
     els.editorTabs.appendChild(button);
   }
 }
@@ -2985,6 +2992,51 @@ function showContextMenu(x, y, items) {
 
 function closeTreeContextMenu() {
   els.treeContextMenu.classList.add("hidden");
+}
+
+function onTabContextMenu(event, path, type) {
+  openTabContextMenu(event.clientX, event.clientY, path, type);
+}
+
+function openTabContextMenu(x, y, path, type) {
+  closeTreeContextMenu();
+  const items = [
+    { label: "Close Tab", shortcut: "⌘W", action: () => closeEditorTab(path, type) },
+    { type: "separator" },
+    { label: "Close All Tabs", action: closeAllEditorTabs }
+  ];
+  showTabContextMenu(x, y, items);
+}
+
+function showTabContextMenu(x, y, items) {
+  els.tabContextMenu.innerHTML = "";
+  for (const item of items) {
+    if (item.type === "separator") {
+      const separator = document.createElement("div");
+      separator.className = "context-menu-separator";
+      els.tabContextMenu.appendChild(separator);
+      continue;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `context-menu-item${item.danger ? " danger" : ""}`;
+    const shortcutHtml = item.shortcut ? `<span class="context-menu-shortcut">${escapeHtml(item.shortcut)}</span>` : "";
+    button.innerHTML = `<span>${escapeHtml(item.label)}</span>${shortcutHtml}`;
+    button.addEventListener("click", () => {
+      closeTabContextMenu();
+      item.action();
+    });
+    els.tabContextMenu.appendChild(button);
+  }
+
+  els.tabContextMenu.classList.remove("hidden");
+  const rect = els.tabContextMenu.getBoundingClientRect();
+  els.tabContextMenu.style.left = `${Math.min(x, globalThis.innerWidth - rect.width - 8)}px`;
+  els.tabContextMenu.style.top = `${Math.min(y, globalThis.innerHeight - rect.height - 8)}px`;
+}
+
+function closeTabContextMenu() {
+  els.tabContextMenu.classList.add("hidden");
 }
 
 function getVisibleTreeRows() {
