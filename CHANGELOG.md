@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.44] - 2026-06-06
+
+- Fix: workspace state save no longer throws ENOENT when multiple concurrent saves race on the same `.tmp` file
+
 ## [0.1.43] - 2026-06-06
 
 - Drag any file (images and non-images) from Finder into the file tree to copy it into the target folder
