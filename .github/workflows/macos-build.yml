@@ -30,8 +30,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          printf 'registry=https://registry.npmjs.org/\n' > "$HOME/.npmrc"
-          npm ci
+          echo 'registry=https://registry.npmjs.org/' > /tmp/ci-npmrc
+          npm ci --userconfig=/tmp/ci-npmrc
 
       - name: Syntax check
         run: |
