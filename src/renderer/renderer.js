@@ -148,6 +148,8 @@ const els = {
   settingsForm: document.getElementById("settingsForm"),
   templatesPathInput: document.getElementById("templatesPathInput"),
   autoLinkUrlsCheckbox: document.getElementById("autoLinkUrlsCheckbox"),
+  treeFontSizeInput: document.getElementById("treeFontSizeInput"),
+  editorFontSizeInput: document.getElementById("editorFontSizeInput"),
   tocUnorderedRadio: document.getElementById("tocUnorderedRadio"),
   tocOrderedRadio: document.getElementById("tocOrderedRadio"),
   tocIncludeSubfoldersCheckbox: document.getElementById("tocIncludeSubfoldersCheckbox"),
@@ -346,6 +348,7 @@ function boot() {
   applyEditorPaneVisibility();
   applyPreviewPaneVisibility();
   applyTerminalPaneVisibility();
+  applyFontSizes();
   syncPaneStateToMenu();
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
@@ -870,6 +873,7 @@ async function openVault(rootPath) {
     state.hasGitRepo = Boolean(vault.hasGitRepo);
     state.gitProvider = vault.gitProvider || null;
     state.settings = normalizeSettings(await globalThis.tektite.loadSettings(state.rootPath).catch(() => null));
+    applyFontSizes();
     state.activePath = null;
     state.activeType = null;
     state.activeContent = "";
@@ -2458,6 +2462,8 @@ function openSettingsDialog() {
   els.tocOrderedRadio.checked = state.settings.tocListStyle === "ordered";
   els.tocUnorderedRadio.checked = state.settings.tocListStyle !== "ordered";
   els.tocIncludeSubfoldersCheckbox.checked = Boolean(state.settings.tocIncludeSubfolders);
+  els.treeFontSizeInput.value = state.settings.treeFontSize;
+  els.editorFontSizeInput.value = state.settings.editorFontSize;
   els.settingsDialog.setAttribute("open", "");
   els.settingsDialog.classList.remove("hidden");
   requestAnimationFrame(() => els.templatesPathInput.focus());
@@ -2474,7 +2480,10 @@ async function onSettingsSubmit(event) {
   const autoLinkUrls = els.autoLinkUrlsCheckbox.checked;
   const tocListStyle = els.tocOrderedRadio.checked ? "ordered" : "unordered";
   const tocIncludeSubfolders = els.tocIncludeSubfoldersCheckbox.checked;
-  state.settings = normalizeSettings({ templatesPath, autoLinkUrls, tocListStyle, tocIncludeSubfolders });
+  const treeFontSize = Number(els.treeFontSizeInput.value) || 13;
+  const editorFontSize = Number(els.editorFontSizeInput.value) || 15;
+  state.settings = normalizeSettings({ templatesPath, autoLinkUrls, tocListStyle, tocIncludeSubfolders, treeFontSize, editorFontSize });
+  applyFontSizes();
   if (state.rootPath) {
     await globalThis.tektite.saveSettings(state.rootPath, state.settings).catch(() => {});
   }
@@ -2487,8 +2496,16 @@ function normalizeSettings(settings = {}) {
     templatesPath: typeof source.templatesPath === "string" ? source.templatesPath : "",
     autoLinkUrls: Boolean(source.autoLinkUrls),
     tocListStyle: source.tocListStyle === "ordered" ? "ordered" : "unordered",
-    tocIncludeSubfolders: Boolean(source.tocIncludeSubfolders)
+    tocIncludeSubfolders: Boolean(source.tocIncludeSubfolders),
+    treeFontSize: Number.isFinite(source.treeFontSize) ? Math.min(24, Math.max(8, source.treeFontSize)) : 13,
+    editorFontSize: Number.isFinite(source.editorFontSize) ? Math.min(32, Math.max(8, source.editorFontSize)) : 15
   };
+}
+
+function applyFontSizes() {
+  const root = document.documentElement;
+  root.style.setProperty("--tree-font-size", `${state.settings.treeFontSize}px`);
+  root.style.setProperty("--editor-font-size", `${state.settings.editorFontSize}px`);
 }
 
 async function restoreWorkspaceState() {

@@ -892,7 +892,9 @@ ipcMain.handle("settings:load", async (_event, rootPath) => {
       templatesPath: typeof parsed.templatesPath === "string" ? parsed.templatesPath : "",
       autoLinkUrls: Boolean(parsed.autoLinkUrls),
       tocListStyle: parsed.tocListStyle === "ordered" ? "ordered" : "unordered",
-      tocIncludeSubfolders: Boolean(parsed.tocIncludeSubfolders)
+      tocIncludeSubfolders: Boolean(parsed.tocIncludeSubfolders),
+      treeFontSize: typeof parsed.treeFontSize === "number" ? parsed.treeFontSize : null,
+      editorFontSize: typeof parsed.editorFontSize === "number" ? parsed.editorFontSize : null
     };
   } catch {
     return { templatesPath: "", autoLinkUrls: false, tocListStyle: "unordered", tocIncludeSubfolders: false };

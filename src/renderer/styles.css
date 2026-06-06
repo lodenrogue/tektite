@@ -28,6 +28,8 @@
   --overlay-bg: rgba(29, 30, 35, 0.94);
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
   --pane-header-height: 64px;
+  --tree-font-size: 13px;
+  --editor-font-size: 15px;
   color-scheme: dark;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -447,6 +449,7 @@ body.resizing-y textarea {
   overflow: auto;
   overscroll-behavior: contain;
   padding: 4px 8px 18px;
+  font-size: var(--tree-font-size);
 }
 
 .tree-row {
@@ -700,7 +703,7 @@ div.tree-row.active {
   background: var(--editor-bg);
   color: var(--ink);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 15px;
+  font-size: var(--editor-font-size);
   line-height: 1.65;
   outline: none;
 }
@@ -939,6 +942,7 @@ div.tree-row.active {
   background: transparent;
   color: var(--muted);
   padding: 0 8px 0 10px;
+  font-size: var(--tree-font-size);
 }
 
 .editor-tab.active {
@@ -1382,6 +1386,7 @@ div.tree-row.active {
   color: var(--ink);
   padding: 0 10px;
   text-align: left;
+  font-size: var(--tree-font-size);
 }
 
 .context-menu-shortcut {
@@ -1527,6 +1532,34 @@ div.tree-row.active {
   height: 15px;
   flex-shrink: 0;
   cursor: pointer;
+}
+
+.settings-font-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.settings-font-input {
+  width: 60px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+
+.settings-font-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .template-row {

@@ -2,6 +2,15 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.51] - 2026-06-06
+
+- Settings: configurable font size for file/folder pane and editor (8–32px range)
+- Editor tabs and context menu items use the same font size as the file/folder pane
+
+## [0.1.50] - 2026-06-06
+
+- Fix: use `node:` prefix for built-in `require` calls in `copy-vendor.js`
+
 ## [0.1.49] - 2026-06-06
 
 - Fix: terminal starts in vault folder when vault is open, home dir otherwise

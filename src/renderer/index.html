@@ -260,6 +260,17 @@
             <span>Include subfolders</span>
           </label>
         </fieldset>
+        <fieldset class="settings-section">
+          <legend>Font Sizes</legend>
+          <div class="settings-font-row">
+            <label for="treeFontSizeInput">File tree (px)</label>
+            <input type="number" id="treeFontSizeInput" class="settings-font-input" min="8" max="24" step="1" />
+          </div>
+          <div class="settings-font-row">
+            <label for="editorFontSizeInput">Editor (px)</label>
+            <input type="number" id="editorFontSizeInput" class="settings-font-input" min="8" max="32" step="1" />
+          </div>
+        </fieldset>
         <footer class="modal-actions">
           <button id="cancelSettingsButton" class="secondary-button" type="button">Cancel</button>
           <button id="saveSettingsButton" class="primary-button" type="submit">Save</button>
