@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.53] - 2026-06-06
+
+- View menu: Toggle Dark/Light Mode moved above Show group; Show Line Numbers added
+- Fix: search field and modal inputs use file/folder pane font size setting
+
 ## [0.1.52] - 2026-06-06
 
 - Optional line numbers gutter in editor (View → Show Line Numbers)
