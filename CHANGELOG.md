@@ -4,9 +4,8 @@ All notable changes to Tektite are documented here.
 
 ## [0.1.45] - 2026-06-06
 
-- Integrated terminal pane (View → Show Terminal) running the system shell with collapse/expand support
-- Nerd Font support for ZSH/OMZ/Powerlevel10k themes
-- CI: version bump workflow moved from main to dev branch; release still publishes on tag push via macos-build
+- Fix: drag and drop of directories from Finder into the file tree now works (fixes [#12](https://github.com/mathiasconradt/tektite/issues/12))
+- CI: version bump workflow moved from main to dev branch; release publishes on tag push via macos-build
 
 ## [0.1.44] - 2026-06-06
 
