@@ -434,6 +434,7 @@ body.resizing-y textarea {
   padding: 0 10px;
   background: var(--panel);
   color: var(--ink);
+  font-size: var(--tree-font-size);
   outline: none;
 }
 
@@ -690,6 +691,59 @@ div.tree-row.active {
 .note-path,
 .save-state {
   font-size: 12px;
+}
+
+.current-line-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 0;
+}
+
+:root[data-theme="light"] .current-line-highlight {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.line-numbers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 52px;
+  padding: 26px 10px 40px 0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: var(--editor-font-size);
+  line-height: 1.65;
+  color: var(--muted);
+  background: var(--editor-bg);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+  text-align: right;
+  user-select: none;
+  opacity: 0.55;
+}
+
+.line-numbers.hidden {
+  display: none;
+}
+
+.line-number {
+  display: block;
+  padding-right: 4px;
+  line-height: 1.65;
+}
+
+.editor-body.line-numbers-on #editor {
+  padding-left: 66px;
+}
+
+.editor-body.line-numbers-on .editor-find-overlay pre {
+  padding-left: 66px;
 }
 
 #editor {
@@ -1467,6 +1521,7 @@ div.tree-row.active {
   border-radius: 6px;
   background: var(--panel);
   color: var(--ink);
+  font-size: var(--tree-font-size);
   outline: none;
   padding: 0 10px;
 }

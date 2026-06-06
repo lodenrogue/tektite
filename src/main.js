@@ -422,14 +422,15 @@ function buildMenu() {
         },
         { type: "separator" },
         {
+          label: "Toggle Dark/Light Mode",
+          click: () => sendToActiveWindow("menu:toggle-theme")
+        },
+        { type: "separator" },
+        {
           label: "Show File Suffixes",
           type: "checkbox",
           checked: s?.showFileExtensions === true,
           click: () => sendToActiveWindow("menu:toggle-file-suffixes")
-        },
-        {
-          label: "Toggle Dark/Light Mode",
-          click: () => sendToActiveWindow("menu:toggle-theme")
         },
         {
           label: "Show Editor Pane",
@@ -460,6 +461,12 @@ function buildMenu() {
           type: "checkbox",
           checked: s?.showTerminalPane === true,
           click: () => sendToActiveWindow("menu:toggle-terminal-pane")
+        },
+        {
+          label: "Show Line Numbers",
+          type: "checkbox",
+          checked: s?.showLineNumbers === true,
+          click: () => sendToActiveWindow("menu:toggle-line-numbers")
         },
         { type: "separator" },
         { role: "toggleDevTools" },

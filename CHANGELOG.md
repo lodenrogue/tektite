@@ -2,6 +2,13 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.52] - 2026-06-06
+
+- Optional line numbers gutter in editor (View → Show Line Numbers)
+- Current line highlight — subtle semi-transparent bar tracks cursor line, spans line numbers gutter too
+- View menu: Toggle Dark/Light Mode moved above Show group with separator
+- Search field and modal template path input now use the file/folder pane font size setting
+
 ## [0.1.51] - 2026-06-06
 
 - Settings: configurable font size for file/folder pane and editor (8–32px range)

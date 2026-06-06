@@ -17,6 +17,7 @@ const state = {
   showEditorPane: true,
   showPreviewPane: true,
   showTerminalPane: false,
+  showLineNumbers: false,
   terminalContentCollapsed: false,
   showTagsPane: true,
   showGraphPane: true,
@@ -186,7 +187,9 @@ const els = {
   terminalResizer: document.getElementById("terminalResizer"),
   terminalPane: document.getElementById("terminalPane"),
   terminalContainer: document.getElementById("terminalContainer"),
-  collapseTerminalButton: document.getElementById("collapseTerminalButton")
+  collapseTerminalButton: document.getElementById("collapseTerminalButton"),
+  lineNumbers: document.getElementById("lineNumbers"),
+  currentLineHighlight: document.getElementById("currentLineHighlight")
 };
 
 boot();
@@ -196,6 +199,7 @@ function boot() {
   state.showEditorPane = localStorage.getItem("tektite:showEditorPane") !== "0";
   state.showPreviewPane = localStorage.getItem("tektite:showPreviewPane") !== "0";
   state.showTerminalPane = localStorage.getItem("tektite:showTerminalPane") === "1";
+  state.showLineNumbers = localStorage.getItem("tektite:showLineNumbers") === "1";
   state.terminalContentCollapsed = localStorage.getItem("tektite:terminalContentCollapsed") === "1";
   state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
   state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
@@ -213,8 +217,12 @@ function boot() {
   els.searchInput.addEventListener("input", renderTree);
   els.editor.addEventListener("input", onEditorInput);
   els.editor.addEventListener("keydown", onEditorKeydown);
-  els.editor.addEventListener("click", updateMentionMenu);
-  els.editor.addEventListener("scroll", positionMentionMenu);
+  els.editor.addEventListener("click", () => { updateMentionMenu(); updateCurrentLineHighlight(); });
+  els.editor.addEventListener("scroll", () => { positionMentionMenu(); updateCurrentLineHighlight(); });
+  els.editor.addEventListener("keyup", updateCurrentLineHighlight);
+  els.editor.addEventListener("focus", updateCurrentLineHighlight);
+  els.editor.addEventListener("blur", () => els.currentLineHighlight.style.opacity = "0");
+  document.addEventListener("selectionchange", () => { if (document.activeElement === els.editor) updateCurrentLineHighlight(); });
   els.editor.addEventListener("paste", onEditorPaste);
   els.editor.addEventListener("dragover", onEditorDragOver);
   els.editor.addEventListener("drop", onEditorDrop);
@@ -297,7 +305,7 @@ function boot() {
   els.fmtImage.addEventListener("click", () => insertMarkdownLink(true));
   els.fmtTable.addEventListener("click", insertTable);
   els.fmtToc.addEventListener("click", () => insertTableOfContents());
-  els.editor.addEventListener("scroll", syncFindOverlayScroll);
+  els.editor.addEventListener("scroll", () => { syncFindOverlayScroll(); syncLineNumbersScroll(); });
   els.settingsButton.addEventListener("click", openSettingsDialog);
   els.settingsForm.addEventListener("submit", onSettingsSubmit);
   els.cancelSettingsButton.addEventListener("click", closeSettingsDialog);
@@ -340,6 +348,7 @@ function boot() {
   globalThis.tektite.onToggleTagsPane(toggleTagsPane);
   globalThis.tektite.onToggleGraphPane(toggleGraphPane);
   globalThis.tektite.onToggleTerminalPane(toggleTerminalPane);
+  globalThis.tektite.onToggleLineNumbers(toggleLineNumbers);
   els.collapseTerminalButton.addEventListener("click", toggleTerminalContent);
   els.terminalResizer.addEventListener("pointerdown", onTerminalResizerDown);
   globalThis.tektite.onOpenSettings(openSettingsDialog);
@@ -349,6 +358,7 @@ function boot() {
   applyPreviewPaneVisibility();
   applyTerminalPaneVisibility();
   applyFontSizes();
+  applyLineNumbers();
   syncPaneStateToMenu();
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
@@ -620,7 +630,8 @@ function syncPaneStateToMenu() {
     showTagsPane: state.showTagsPane,
     showGraphPane: state.showGraphPane,
     showFileExtensions: state.showFileExtensions,
-    showTerminalPane: state.showTerminalPane
+    showTerminalPane: state.showTerminalPane,
+    showLineNumbers: state.showLineNumbers
   }).catch(() => {});
 }
 
@@ -638,6 +649,59 @@ function applyPreviewPaneVisibility() {
 
 // ── Terminal ─────────────────────────────────────────────────────────────────
 let termInstance = null;
+
+function toggleLineNumbers() {
+  state.showLineNumbers = !state.showLineNumbers;
+  localStorage.setItem("tektite:showLineNumbers", state.showLineNumbers ? "1" : "0");
+  applyLineNumbers();
+  syncPaneStateToMenu();
+}
+
+function applyLineNumbers() {
+  const editorBody = document.querySelector(".editor-body");
+  if (!editorBody) return;
+  editorBody.classList.toggle("line-numbers-on", state.showLineNumbers);
+  if (state.showLineNumbers) {
+    els.lineNumbers.classList.remove("hidden");
+    renderLineNumbers();
+  } else {
+    els.lineNumbers.classList.add("hidden");
+  }
+}
+
+function renderLineNumbers() {
+  if (!state.showLineNumbers) return;
+  const lines = els.editor.value.split("\n");
+  els.lineNumbers.innerHTML = lines.map((_, i) =>
+    `<span class="line-number">${i + 1}</span>`
+  ).join("");
+  syncLineNumbersScroll();
+}
+
+function syncLineNumbersScroll() {
+  if (state.showLineNumbers) els.lineNumbers.scrollTop = els.editor.scrollTop;
+}
+
+function updateCurrentLineHighlight() {
+  if (!state.activePath || state.activeType !== "note" || els.editor.disabled) {
+    els.currentLineHighlight.style.opacity = "0";
+    return;
+  }
+  const style = getComputedStyle(els.editor);
+  const fontSize = Number.parseFloat(style.fontSize) || 15;
+  const lineHeight = fontSize * 1.65;
+  const paddingTop = Number.parseFloat(style.paddingTop) || 26;
+  const cursor = els.editor.selectionStart;
+  const lineIdx = els.editor.value.slice(0, cursor).split("\n").length - 1;
+  const top = paddingTop + lineIdx * lineHeight - els.editor.scrollTop;
+  if (top < 0 || top > els.editor.clientHeight + lineHeight) {
+    els.currentLineHighlight.style.opacity = "0";
+    return;
+  }
+  els.currentLineHighlight.style.top = `${top}px`;
+  els.currentLineHighlight.style.height = `${lineHeight}px`;
+  els.currentLineHighlight.style.opacity = "1";
+}
 
 function toggleTerminalPane() {
   state.showTerminalPane = !state.showTerminalPane;
@@ -1832,6 +1896,8 @@ async function activateTab(relativePath, type, options = {}) {
     resetEditorHistory(content, Math.min(cursor, content.length));
     renderPreview(content);
     if (options.focusEditor !== false) els.editor.focus();
+    if (state.showLineNumbers) renderLineNumbers();
+    updateCurrentLineHighlight();
   } else {
     state.activeContent = "";
     els.editor.disabled = true;
@@ -1974,6 +2040,7 @@ function onEditorInput() {
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveActiveNote, 450);
   if (state.find.active) updateFindMatches();
+  if (state.showLineNumbers) renderLineNumbers();
 }
 
 function resetEditorHistory(content, cursor = 0) {
