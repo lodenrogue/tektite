@@ -360,7 +360,7 @@ function boot() {
     restoreLastVault().catch(() => showEmptyState());
   }
 
-  window.tektite.onTerminalKill(() => {
+  globalThis.tektite.onTerminalKill(() => {
     destroyTerminal();
     toggleTerminalContent();
   });
