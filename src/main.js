@@ -1034,26 +1034,51 @@ ipcMain.handle("asset:import-image", async (_event, rootPath, sourcePath, target
   };
 });
 
-ipcMain.handle("asset:import-file", async (_event, rootPath, sourcePath, targetFolder = "") => {
-  log("asset:import-file", { sourcePath, targetFolder });
+ipcMain.handle("asset:import-file-or-directory", async (_event, rootPath, sourcePath, targetFolder = "") => {
+  log("asset:import-file-or-directory", { sourcePath, targetFolder });
+
   const sourceStat = await fs.stat(sourcePath);
-  if (!sourceStat.isFile()) throw new Error("Dropped item is not a file.");
+  const isDirectory = sourceStat.isDirectory();
+  const isFile = sourceStat.isFile();
 
-  const extension = path.extname(sourcePath).toLowerCase();
-  const baseName = sanitizeEntryName(path.basename(sourcePath, extension), "file");
+  if (!isFile && !isDirectory) {
+    throw new Error("Dropped item is neither a file nor a directory.");
+  }
+
   const baseFolder = normalizeRelative(targetFolder);
-  let candidate = path.posix.join(baseFolder, `${baseName}${extension}`);
-  let index = 2;
+  let candidate = "";
 
-  while (await exists(path.join(rootPath, candidate))) {
-    candidate = path.posix.join(baseFolder, `${baseName} ${index}${extension}`);
-    index += 1;
+  if (isFile) {
+    const extension = path.extname(sourcePath).toLowerCase();
+    const baseName = sanitizeEntryName(path.basename(sourcePath, extension), "file");
+    candidate = path.posix.join(baseFolder, `${baseName}${extension}`);
+
+    let index = 2;
+    while (await exists(path.join(rootPath, candidate))) {
+      candidate = path.posix.join(baseFolder, `${baseName} ${index}${extension}`);
+      index += 1;
+    }
+  } else {
+    const sourceName = sanitizeEntryName(path.basename(sourcePath), "folder");
+    candidate = path.posix.join(baseFolder, sourceName);
+
+    let index = 2;
+    while (await exists(path.join(rootPath, candidate))) {
+      candidate = path.posix.join(baseFolder, `${sourceName} ${index}`);
+      index += 1;
+    }
   }
 
   const destinationPath = resolveVaultPath(rootPath, candidate);
+  
   await fs.mkdir(path.dirname(destinationPath), { recursive: true });
-  await fs.copyFile(sourcePath, destinationPath);
-  return candidate;
+  await fs.cp(sourcePath, destinationPath, { recursive: true });
+
+  return {
+    path: candidate,
+    name: path.basename(candidate),
+    label: isFile ? path.basename(candidate, path.extname(candidate)) : path.basename(candidate)
+  };
 });
 
 ipcMain.handle("asset:save-clipboard-image", async (_event, rootPath, targetFolder = "", image = {}) => {
