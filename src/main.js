@@ -461,6 +461,12 @@ function buildMenu() {
           checked: s?.showTerminalPane === true,
           click: () => sendToActiveWindow("menu:toggle-terminal-pane")
         },
+        {
+          label: "Show Line Numbers",
+          type: "checkbox",
+          checked: s?.showLineNumbers === true,
+          click: () => sendToActiveWindow("menu:toggle-line-numbers")
+        },
         { type: "separator" },
         { role: "toggleDevTools" },
         { type: "separator" },

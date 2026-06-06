@@ -692,6 +692,45 @@ div.tree-row.active {
   font-size: 12px;
 }
 
+.line-numbers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 52px;
+  padding: 26px 10px 40px 0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: var(--editor-font-size);
+  line-height: 1.65;
+  color: var(--muted);
+  background: var(--editor-bg);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+  text-align: right;
+  user-select: none;
+  opacity: 0.55;
+}
+
+.line-numbers.hidden {
+  display: none;
+}
+
+.line-number {
+  display: block;
+  padding-right: 4px;
+  line-height: 1.65;
+}
+
+.editor-body.line-numbers-on #editor {
+  padding-left: 66px;
+}
+
+.editor-body.line-numbers-on .editor-find-overlay pre {
+  padding-left: 66px;
+}
+
 #editor {
   width: 100%;
   min-height: 0;
