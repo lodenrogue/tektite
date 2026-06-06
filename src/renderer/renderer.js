@@ -188,7 +188,8 @@ const els = {
   terminalPane: document.getElementById("terminalPane"),
   terminalContainer: document.getElementById("terminalContainer"),
   collapseTerminalButton: document.getElementById("collapseTerminalButton"),
-  lineNumbers: document.getElementById("lineNumbers")
+  lineNumbers: document.getElementById("lineNumbers"),
+  currentLineHighlight: document.getElementById("currentLineHighlight")
 };
 
 boot();
@@ -216,8 +217,12 @@ function boot() {
   els.searchInput.addEventListener("input", renderTree);
   els.editor.addEventListener("input", onEditorInput);
   els.editor.addEventListener("keydown", onEditorKeydown);
-  els.editor.addEventListener("click", updateMentionMenu);
-  els.editor.addEventListener("scroll", positionMentionMenu);
+  els.editor.addEventListener("click", () => { updateMentionMenu(); updateCurrentLineHighlight(); });
+  els.editor.addEventListener("scroll", () => { positionMentionMenu(); updateCurrentLineHighlight(); });
+  els.editor.addEventListener("keyup", updateCurrentLineHighlight);
+  els.editor.addEventListener("focus", updateCurrentLineHighlight);
+  els.editor.addEventListener("blur", () => els.currentLineHighlight.style.opacity = "0");
+  document.addEventListener("selectionchange", () => { if (document.activeElement === els.editor) updateCurrentLineHighlight(); });
   els.editor.addEventListener("paste", onEditorPaste);
   els.editor.addEventListener("dragover", onEditorDragOver);
   els.editor.addEventListener("drop", onEditorDrop);
@@ -675,6 +680,27 @@ function renderLineNumbers() {
 
 function syncLineNumbersScroll() {
   if (state.showLineNumbers) els.lineNumbers.scrollTop = els.editor.scrollTop;
+}
+
+function updateCurrentLineHighlight() {
+  if (!state.activePath || state.activeType !== "note" || els.editor.disabled) {
+    els.currentLineHighlight.style.opacity = "0";
+    return;
+  }
+  const style = getComputedStyle(els.editor);
+  const fontSize = Number.parseFloat(style.fontSize) || 15;
+  const lineHeight = fontSize * 1.65;
+  const paddingTop = Number.parseFloat(style.paddingTop) || 26;
+  const cursor = els.editor.selectionStart;
+  const lineIdx = els.editor.value.slice(0, cursor).split("\n").length - 1;
+  const top = paddingTop + lineIdx * lineHeight - els.editor.scrollTop;
+  if (top < 0 || top > els.editor.clientHeight + lineHeight) {
+    els.currentLineHighlight.style.opacity = "0";
+    return;
+  }
+  els.currentLineHighlight.style.top = `${top}px`;
+  els.currentLineHighlight.style.height = `${lineHeight}px`;
+  els.currentLineHighlight.style.opacity = "1";
 }
 
 function toggleTerminalPane() {
@@ -1871,6 +1897,7 @@ async function activateTab(relativePath, type, options = {}) {
     renderPreview(content);
     if (options.focusEditor !== false) els.editor.focus();
     if (state.showLineNumbers) renderLineNumbers();
+    updateCurrentLineHighlight();
   } else {
     state.activeContent = "";
     els.editor.disabled = true;

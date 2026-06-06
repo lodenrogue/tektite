@@ -422,14 +422,15 @@ function buildMenu() {
         },
         { type: "separator" },
         {
+          label: "Toggle Dark/Light Mode",
+          click: () => sendToActiveWindow("menu:toggle-theme")
+        },
+        { type: "separator" },
+        {
           label: "Show File Suffixes",
           type: "checkbox",
           checked: s?.showFileExtensions === true,
           click: () => sendToActiveWindow("menu:toggle-file-suffixes")
-        },
-        {
-          label: "Toggle Dark/Light Mode",
-          click: () => sendToActiveWindow("menu:toggle-theme")
         },
         {
           label: "Show Editor Pane",

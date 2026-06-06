@@ -434,6 +434,7 @@ body.resizing-y textarea {
   padding: 0 10px;
   background: var(--panel);
   color: var(--ink);
+  font-size: var(--tree-font-size);
   outline: none;
 }
 
@@ -690,6 +691,20 @@ div.tree-row.active {
 .note-path,
 .save-state {
   font-size: 12px;
+}
+
+.current-line-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 0;
+}
+
+:root[data-theme="light"] .current-line-highlight {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .line-numbers {
@@ -1506,6 +1521,7 @@ div.tree-row.active {
   border-radius: 6px;
   background: var(--panel);
   color: var(--ink);
+  font-size: var(--tree-font-size);
   outline: none;
   padding: 0 10px;
 }
