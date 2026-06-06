@@ -1,5 +1,5 @@
 cask "tektite" do
-  version "0.1.49"
+  version "0.1.50"
   sha256 :no_check
 
   on_arm do
