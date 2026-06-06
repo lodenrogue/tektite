@@ -2,6 +2,14 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.46] - 2026-06-06
+
+- Integrated terminal pane at the bottom of the workspace (View → Show Terminal)
+- Terminal runs the system default shell (zsh, bash, etc.) via node-pty
+- Nerd Font support for ZSH themes such as Oh My Zsh with Powerlevel10k
+- Collapse/expand terminal content with `+`/`-` button like Tags and Graph panes
+- Drag the resizer to adjust terminal height
+
 ## [0.1.45] - 2026-06-06
 
 - Fix: drag and drop of directories from Finder into the file tree now works (fixes [#12](https://github.com/mathiasconradt/tektite/issues/12))

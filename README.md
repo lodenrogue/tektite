@@ -43,6 +43,7 @@ There is no login, cloud sync service, telemetry, remote storage, account system
 - Drag individual graph nodes to reposition them.
 - Toggle dark and light mode. Dark mode is the default.
 - Configure vault-specific settings (templates folder path) via the Settings dialog.
+- Built-in terminal pane running the system shell (zsh, bash, etc.) at the bottom of the workspace.
 
 ## Documentation
 
