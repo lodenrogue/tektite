@@ -665,6 +665,7 @@ function applyTerminalContentCollapsed() {
   const pane = els.terminalPane;
   if (!pane) return;
   pane.classList.toggle("content-collapsed", state.terminalContentCollapsed);
+  if (state.terminalContentCollapsed) pane.style.height = "";
   els.collapseTerminalButton.textContent = state.terminalContentCollapsed ? "+" : "-";
   els.collapseTerminalButton.setAttribute("aria-label", state.terminalContentCollapsed ? "Expand Terminal" : "Collapse Terminal");
 }
@@ -862,6 +863,7 @@ async function openVault(rootPath) {
     }
     log("openVault scan complete", { notes: vault.notes.length });
     state.rootPath = vault.rootPath;
+    if (termInstance?.pid) globalThis.tektite.terminalWrite(termInstance.pid, `cd ${JSON.stringify(vault.rootPath)}\n`);
     state.tree = vault.tree;
     state.notes = vault.notes;
     state.previewRevision = Date.now();

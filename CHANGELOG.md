@@ -2,6 +2,13 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.49] - 2026-06-06
+
+- Fix: terminal starts in vault folder when vault is open, home dir otherwise
+- Fix: terminal collapse now correctly shrinks to header and expands editor/preview
+- Fix: remote images (badges, API-served images, URLs without file extension) now render in preview
+- Fix: remote image URLs with query string parameters (e.g. `&`) render correctly
+
 ## [0.1.48] - 2026-06-06
 
 - CI: fix package-lock.json resolved URLs rewritten from JFrog to npmjs.org on every build
