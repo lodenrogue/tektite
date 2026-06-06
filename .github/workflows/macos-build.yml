@@ -27,6 +27,13 @@ jobs:
         with:
           node-version: 22
 
+      - name: Debug npm config
+        run: |
+          echo "=== ~/.npmrc ===" && cat ~/.npmrc 2>/dev/null || echo "(none)"
+          echo "=== .npmrc ===" && cat .npmrc 2>/dev/null || echo "(none)"
+          echo "=== npm config list ===" && npm config list
+          echo "=== NODE_AUTH_TOKEN set ===" && [ -z "${NODE_AUTH_TOKEN:-}" ] && echo "empty" || echo "set"
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
