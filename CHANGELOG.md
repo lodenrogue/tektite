@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.54] - 2026-06-06
+
+- Fix: line numbers display correctly when no vault or note is open
+- Fix: SonarQube — remove use of return value from void function
+
 ## [0.1.53] - 2026-06-06
 
 - View menu: Toggle Dark/Light Mode moved above Show group; Show Line Numbers added

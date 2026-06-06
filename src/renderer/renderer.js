@@ -326,7 +326,7 @@ function boot() {
   els.findCloseButton.addEventListener("click", closeFindBar);
   globalThis.addEventListener("click", (event) => {
     if (!event.target.closest?.("#treeContextMenu")) closeTreeContextMenu();
-    if (!event.target.closest?.("#tabContextMenu")) closeTabContextMenu?.();
+    if (!event.target.closest?.("#tabContextMenu") && typeof closeTabContextMenu === "function") closeTabContextMenu();
   });
   globalThis.addEventListener("resize", () => {
     applyLayout();
