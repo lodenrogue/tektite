@@ -669,15 +669,15 @@ function applyLineNumbers() {
   if (!editorBody) return;
   editorBody.classList.toggle("line-numbers-on", state.showLineNumbers);
   if (state.showLineNumbers) {
-    els.lineNumbers.classList.remove("hidden");
-    renderLineNumbers();
+    els.lineNumbers.classList.toggle("hidden", !state.activePath);
+    if (state.activePath) renderLineNumbers();
   } else {
     els.lineNumbers.classList.add("hidden");
   }
 }
 
 function renderLineNumbers() {
-  if (!state.showLineNumbers) return;
+  if (!state.showLineNumbers || !state.activePath) return;
   const lines = els.editor.value.split("\n");
   els.lineNumbers.innerHTML = lines.map((_, i) =>
     `<span class="line-number">${i + 1}</span>`
