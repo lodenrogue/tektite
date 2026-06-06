@@ -56,6 +56,11 @@ contextBridge.exposeInMainWorld("tektite", {
   terminalWrite: (pid, data) => ipcRenderer.invoke("terminal:write", pid, data),
   terminalResize: (pid, cols, rows) => ipcRenderer.invoke("terminal:resize", pid, cols, rows),
   terminalDestroy: (pid) => ipcRenderer.invoke("terminal:destroy", pid),
+  onTerminalKill: (callback) => {
+    const listener = (_event, ...args) => callback(...args);
+    ipcRenderer.on("terminal:kill", listener);
+    return () => ipcRenderer.removeListener("terminal:kill", listener);
+  },
   onTerminalData: (pid, cb) => {
     const ch = `terminal:data:${pid}`;
     const fn = (_e, d) => cb(d);

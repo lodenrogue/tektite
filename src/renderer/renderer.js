@@ -369,6 +369,11 @@ function boot() {
   } else {
     restoreLastVault().catch(() => showEmptyState());
   }
+
+  globalThis.tektite.onTerminalKill(() => {
+    destroyTerminal();
+    toggleTerminalContent();
+  });
 }
 
 async function restoreLastVault() {
@@ -708,6 +713,10 @@ function toggleTerminalPane() {
   localStorage.setItem("tektite:showTerminalPane", state.showTerminalPane ? "1" : "0");
   applyTerminalPaneVisibility();
   syncPaneStateToMenu();
+
+  if (state.showTerminalPane) {
+    toggleTerminalContent();
+  }
 }
 
 function applyTerminalPaneVisibility() {
@@ -725,7 +734,13 @@ function toggleTerminalContent() {
   state.terminalContentCollapsed = !state.terminalContentCollapsed;
   localStorage.setItem("tektite:terminalContentCollapsed", state.terminalContentCollapsed ? "1" : "0");
   applyTerminalContentCollapsed();
-  if (!state.terminalContentCollapsed) setTimeout(fitTerminal, 50);
+
+  if (!state.terminalContentCollapsed) {
+    if(termInstance === null) {
+      initTerminal();
+    }
+    setTimeout(fitTerminal, 50);
+  }
 }
 
 function applyTerminalContentCollapsed() {
