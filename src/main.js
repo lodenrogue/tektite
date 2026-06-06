@@ -3,6 +3,8 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
 const path = require("node:path");
+let pty; try { pty = require("node-pty"); } catch {}
+const ptySessions = new Map();
 
 let mainWindow;
 let aboutWindow;
@@ -452,6 +454,12 @@ function buildMenu() {
           type: "checkbox",
           checked: s?.showGraphPane !== false,
           click: () => sendToActiveWindow("menu:toggle-graph-pane")
+        },
+        {
+          label: "Show Terminal",
+          type: "checkbox",
+          checked: s?.showTerminalPane === true,
+          click: () => sendToActiveWindow("menu:toggle-terminal-pane")
         },
         { type: "separator" },
         { role: "toggleDevTools" },
@@ -1794,4 +1802,31 @@ function formatGitCommandOutput(command, result, emptyOutput = "") {
   if (result.error && result.code !== 0 && !result.stderr.trim()) parts.push("", result.error);
   return parts.join("\n");
 }
+
+// ── Terminal (node-pty) ──────────────────────────────────────────────────────
+
+ipcMain.handle("terminal:create", (event, cwd, cols, rows) => {
+  if (!pty) return null;
+  const shell = process.env.SHELL || "/bin/sh";
+  const safeCwd = cwd && fsSync.existsSync(cwd) ? cwd : app.getPath("home");
+  const ptyProc = pty.spawn(shell, [], {
+    name: "xterm-256color",
+    cols: cols || 80,
+    rows: rows || 24,
+    cwd: safeCwd,
+    env: { ...process.env, TERM: "xterm-256color" }
+  });
+  const { pid } = ptyProc;
+  ptySessions.set(pid, ptyProc);
+  ptyProc.onData((data) => { event.sender.send(`terminal:data:${pid}`, data); });
+  ptyProc.onExit(() => { ptySessions.delete(pid); });
+  return pid;
+});
+
+ipcMain.handle("terminal:write", (_e, pid, data) => { ptySessions.get(pid)?.write(data); });
+ipcMain.handle("terminal:resize", (_e, pid, cols, rows) => { ptySessions.get(pid)?.resize(cols, rows); });
+ipcMain.handle("terminal:destroy", (_e, pid) => {
+  const p = ptySessions.get(pid);
+  if (p) { try { p.kill(); } catch {} ptySessions.delete(pid); }
+});
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tektite</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="../vendor/xterm.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -101,6 +102,7 @@
       <hr id="sidebarResizer" class="resizer resizer-sidebar" aria-label="Resize sidebar">
 
       <main class="workspace">
+        <div id="workspaceContent" class="workspace-content">
         <section class="editor-pane">
           <div class="note-toolbar">
             <div>
@@ -181,6 +183,15 @@
             </div>
           </div>
           <article id="preview" class="markdown-preview"></article>
+        </section>
+        </div>
+        <hr id="terminalResizer" class="resizer-y resizer-terminal hidden" aria-label="Resize terminal">
+        <section id="terminalPane" class="terminal-pane hidden" aria-label="Terminal">
+          <div class="pane-header terminal-pane-header">
+            <span>Terminal</span>
+            <button id="collapseTerminalButton" type="button" class="pane-collapse-button" aria-label="Collapse Terminal">-</button>
+          </div>
+          <div id="terminalContainer" class="terminal-container"></div>
         </section>
       </main>
     </div>
@@ -269,6 +280,8 @@
       </form>
     </dialog>
 
+    <script src="../vendor/xterm.js"></script>
+    <script src="../vendor/addon-fit.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>
