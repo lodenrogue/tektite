@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          printf 'registry=https://registry.npmjs.org/\n' > "$HOME/.npmrc"
           npm ci
 
       - name: Syntax check
