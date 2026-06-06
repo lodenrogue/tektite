@@ -1769,4 +1769,3 @@ function formatGitCommandOutput(command, result, emptyOutput = "") {
   if (result.error && result.code !== 0 && !result.stderr.trim()) parts.push("", result.error);
   return parts.join("\n");
 }
-
