@@ -332,6 +332,7 @@ function boot() {
     applyLayout();
     updateGraph();
     fitTerminal();
+    if (state.showLineNumbers) renderLineNumbers();
   });
   globalThis.addEventListener("beforeunload", saveWorkspaceState);
 
@@ -679,10 +680,24 @@ function applyLineNumbers() {
 function renderLineNumbers() {
   if (!state.showLineNumbers) return;
   if (!state.activePath) { els.lineNumbers.innerHTML = ""; return; }
+
+  const style = getComputedStyle(els.editor);
+  const fontSize = Number.parseFloat(style.fontSize) || 15;
+  const lineHeight = fontSize * 1.65;
+  const paddingLeft = Number.parseFloat(style.paddingLeft) || 28;
+  const paddingRight = Number.parseFloat(style.paddingRight) || 28;
+  const contentWidth = Math.max(1, els.editor.clientWidth - paddingLeft - paddingRight);
+  // SFMono/monospace character width approximation
+  const charWidth = fontSize * 0.601;
+  const charsPerLine = Math.max(1, Math.floor(contentWidth / charWidth));
+
   const lines = els.editor.value.split("\n");
-  els.lineNumbers.innerHTML = lines.map((_, i) =>
-    `<span class="line-number">${i + 1}</span>`
-  ).join("");
+  els.lineNumbers.innerHTML = lines.map((line, i) => {
+    const visualLines = Math.max(1, Math.ceil((line.length || 0.1) / charsPerLine));
+    const h = visualLines * lineHeight;
+    return `<span class="line-number" style="height:${h}px">${i + 1}</span>`;
+  }).join("");
+
   syncLineNumbersScroll();
 }
 

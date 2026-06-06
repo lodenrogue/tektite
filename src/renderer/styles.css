@@ -733,9 +733,12 @@ div.tree-row.active {
 }
 
 .line-number {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
   padding-right: 4px;
   line-height: 1.65;
+  overflow: hidden;
 }
 
 .editor-body.line-numbers-on #editor {
