@@ -16,6 +16,8 @@ const state = {
   showFileExtensions: false,
   showEditorPane: true,
   showPreviewPane: true,
+  showTerminalPane: false,
+  terminalContentCollapsed: false,
   showTagsPane: true,
   showGraphPane: true,
   tagsContentCollapsed: false,
@@ -177,7 +179,12 @@ const els = {
   findPrevButton: document.getElementById("findPrevButton"),
   findNextButton: document.getElementById("findNextButton"),
   findCloseButton: document.getElementById("findCloseButton"),
-  editorFindOverlay: document.getElementById("editorFindOverlay")
+  editorFindOverlay: document.getElementById("editorFindOverlay"),
+  workspaceContent: document.getElementById("workspaceContent"),
+  terminalResizer: document.getElementById("terminalResizer"),
+  terminalPane: document.getElementById("terminalPane"),
+  terminalContainer: document.getElementById("terminalContainer"),
+  collapseTerminalButton: document.getElementById("collapseTerminalButton")
 };
 
 boot();
@@ -186,6 +193,8 @@ function boot() {
   state.showFileExtensions = localStorage.getItem("tektite:showFileExtensions") === "1";
   state.showEditorPane = localStorage.getItem("tektite:showEditorPane") !== "0";
   state.showPreviewPane = localStorage.getItem("tektite:showPreviewPane") !== "0";
+  state.showTerminalPane = localStorage.getItem("tektite:showTerminalPane") === "1";
+  state.terminalContentCollapsed = localStorage.getItem("tektite:terminalContentCollapsed") === "1";
   state.showTagsPane = localStorage.getItem("tektite:showTagsPane") !== "0";
   state.showGraphPane = localStorage.getItem("tektite:showGraphPane") !== "0";
   state.tagsContentCollapsed = localStorage.getItem("tektite:tagsContentCollapsed") === "1";
@@ -310,6 +319,7 @@ function boot() {
   globalThis.addEventListener("resize", () => {
     applyLayout();
     updateGraph();
+    fitTerminal();
   });
   globalThis.addEventListener("beforeunload", saveWorkspaceState);
 
@@ -327,11 +337,15 @@ function boot() {
   globalThis.tektite.onTogglePreviewPane(togglePreviewPane);
   globalThis.tektite.onToggleTagsPane(toggleTagsPane);
   globalThis.tektite.onToggleGraphPane(toggleGraphPane);
+  globalThis.tektite.onToggleTerminalPane(toggleTerminalPane);
+  els.collapseTerminalButton.addEventListener("click", toggleTerminalContent);
+  els.terminalResizer.addEventListener("pointerdown", onTerminalResizerDown);
   globalThis.tektite.onOpenSettings(openSettingsDialog);
 
   applyTheme(localStorage.getItem("tektite:theme") || "dark");
   applyEditorPaneVisibility();
   applyPreviewPaneVisibility();
+  applyTerminalPaneVisibility();
   syncPaneStateToMenu();
   applyTagsPaneVisibility();
   applyGraphPaneVisibility();
@@ -437,13 +451,13 @@ function applyLayout() {
   const workspaceWidth = Math.max(0, windowWidth - state.layout.sidebarWidth - 6);
   const editorWidth = Math.round(Math.max(1, workspaceWidth - 6) * state.layout.editorRatio);
   if (!state.showEditorPane && !state.showPreviewPane) {
-    els.workspace.style.gridTemplateColumns = `0 0 0`;
+    els.workspaceContent.style.gridTemplateColumns = `0 0 0`;
   } else if (state.showEditorPane && !state.showPreviewPane) {
-    els.workspace.style.gridTemplateColumns = `minmax(0, 1fr) 0 0`;
+    els.workspaceContent.style.gridTemplateColumns = `minmax(0, 1fr) 0 0`;
   } else if (state.showPreviewPane && !state.showEditorPane) {
-    els.workspace.style.gridTemplateColumns = `0 0 minmax(0, 1fr)`;
+    els.workspaceContent.style.gridTemplateColumns = `0 0 minmax(0, 1fr)`;
   } else {
-    els.workspace.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
+    els.workspaceContent.style.gridTemplateColumns = `minmax(260px, ${editorWidth}px) 6px minmax(260px, 1fr)`;
   }
 }
 
@@ -498,7 +512,7 @@ function maxGraphHeight() {
 
 function startResize(event, target) {
   event.preventDefault();
-  const workspaceRect = els.workspace.getBoundingClientRect();
+  const workspaceRect = els.workspaceContent.getBoundingClientRect();
   state.activeResize = {
     target,
     pointerId: event.pointerId,
@@ -602,7 +616,8 @@ function syncPaneStateToMenu() {
     showPreviewPane: state.showPreviewPane,
     showTagsPane: state.showTagsPane,
     showGraphPane: state.showGraphPane,
-    showFileExtensions: state.showFileExtensions
+    showFileExtensions: state.showFileExtensions,
+    showTerminalPane: state.showTerminalPane
   }).catch(() => {});
 }
 
@@ -617,6 +632,109 @@ function applyPreviewPaneVisibility() {
   els.workspaceResizer.hidden = !state.showEditorPane || !state.showPreviewPane;
   applyLayout();
 }
+
+// ── Terminal ─────────────────────────────────────────────────────────────────
+let termInstance = null;
+
+function toggleTerminalPane() {
+  state.showTerminalPane = !state.showTerminalPane;
+  localStorage.setItem("tektite:showTerminalPane", state.showTerminalPane ? "1" : "0");
+  applyTerminalPaneVisibility();
+  syncPaneStateToMenu();
+}
+
+function applyTerminalPaneVisibility() {
+  els.terminalPane.classList.toggle("hidden", !state.showTerminalPane);
+  els.terminalResizer.classList.toggle("hidden", !state.showTerminalPane);
+  if (state.showTerminalPane) {
+    applyTerminalContentCollapsed();
+    setTimeout(initTerminal, 60);
+  } else {
+    destroyTerminal();
+  }
+}
+
+function toggleTerminalContent() {
+  state.terminalContentCollapsed = !state.terminalContentCollapsed;
+  localStorage.setItem("tektite:terminalContentCollapsed", state.terminalContentCollapsed ? "1" : "0");
+  applyTerminalContentCollapsed();
+  if (!state.terminalContentCollapsed) setTimeout(fitTerminal, 50);
+}
+
+function applyTerminalContentCollapsed() {
+  const pane = els.terminalPane;
+  if (!pane) return;
+  pane.classList.toggle("content-collapsed", state.terminalContentCollapsed);
+  els.collapseTerminalButton.textContent = state.terminalContentCollapsed ? "+" : "-";
+  els.collapseTerminalButton.setAttribute("aria-label", state.terminalContentCollapsed ? "Expand Terminal" : "Collapse Terminal");
+}
+
+function initTerminal() {
+  if (termInstance) { fitTerminal(); return; }
+  const TermCls = globalThis.Terminal;
+  const FitCls = globalThis.FitAddon?.FitAddon;
+  if (!TermCls) return;
+  const term = new TermCls({
+    fontFamily: '"MesloLGS NF", "Hack Nerd Font", "FiraCode Nerd Font", "JetBrainsMono Nerd Font", "Cascadia Code PL", "DejaVu Sans Mono for Powerline", "SFMono-Regular", Consolas, monospace',
+    fontSize: 13,
+    theme: { background: "#0d0e11", foreground: "#f6f2e8", cursor: "#65a8ad" },
+    cursorBlink: true
+  });
+  const fit = FitCls ? new FitCls() : null;
+  if (fit) term.loadAddon(fit);
+  term.open(els.terminalContainer);
+  requestAnimationFrame(() => {
+    if (fit) fit.fit();
+    globalThis.tektite.terminalCreate(state.rootPath || "", term.cols, term.rows)
+      .then((pid) => {
+        if (!pid) { term.write("\r\n\x1b[31mFailed to start terminal (node-pty unavailable).\x1b[0m\r\n"); termInstance = { term, fit, pid: null }; return; }
+        term.onData((d) => globalThis.tektite.terminalWrite(pid, d));
+        const unsub = globalThis.tektite.onTerminalData(pid, (d) => term.write(d));
+        termInstance = { term, fit, pid, unsub };
+      })
+      .catch(() => { term.write("\r\n\x1b[31mFailed to start terminal.\x1b[0m\r\n"); termInstance = { term, fit, pid: null }; });
+  });
+}
+
+function destroyTerminal() {
+  if (!termInstance) return;
+  const { term, pid, unsub } = termInstance;
+  unsub?.();
+  if (pid) globalThis.tektite.terminalDestroy(pid);
+  term.dispose();
+  termInstance = null;
+}
+
+function fitTerminal() {
+  if (!termInstance?.fit) return;
+  termInstance.fit.fit();
+  if (termInstance.pid) globalThis.tektite.terminalResize(termInstance.pid, termInstance.term.cols, termInstance.term.rows);
+}
+
+let termResizerDrag = null;
+
+function onTerminalResizerDown(event) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  termResizerDrag = { startY: event.clientY, startH: els.terminalPane?.offsetHeight || 260 };
+  els.terminalResizer.setPointerCapture(event.pointerId);
+  const onMove = (e) => {
+    if (!termResizerDrag) return;
+    const delta = termResizerDrag.startY - e.clientY;
+    const newH = Math.max(80, Math.min(globalThis.innerHeight - 200, termResizerDrag.startH + delta));
+    const pane = els.terminalPane;
+    if (pane) pane.style.height = `${newH}px`;
+    fitTerminal();
+  };
+  const onUp = () => {
+    termResizerDrag = null;
+    globalThis.removeEventListener("pointermove", onMove);
+    globalThis.removeEventListener("pointerup", onUp);
+  };
+  globalThis.addEventListener("pointermove", onMove);
+  globalThis.addEventListener("pointerup", onUp);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function toggleGraphPane() {
   state.showGraphPane = !state.showGraphPane;

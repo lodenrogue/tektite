@@ -16,8 +16,9 @@ Tektite is a lightweight Markdown knowledge base for macOS and Linux. It works e
 8. [Git Sync](#git-sync)
 9. [Templates](#templates)
 10. [Settings](#settings)
-11. [Layout & Appearance](#layout--appearance)
-12. [Keyboard Shortcuts](#keyboard-shortcuts)
+11. [Terminal](#terminal)
+12. [Layout & Appearance](#layout--appearance)
+13. [Keyboard Shortcuts](#keyboard-shortcuts)
 
 ---
 
@@ -298,17 +299,56 @@ Use **File › New Window** (`Cmd+N`) to open a second window. Each window is in
 
 ---
 
+## Terminal
+
+An integrated terminal pane can be shown at the bottom of the workspace, spanning across the editor and preview panes.
+
+### Showing the terminal
+
+Open the terminal via **View › Show Terminal**. A checkmark appears next to the menu item when the terminal is visible. The pane persists its visibility state across sessions.
+
+### Using the terminal
+
+The terminal runs your system's default shell (e.g. `zsh` on macOS). It starts in the directory of the currently open vault, or in your home directory if no vault is open.
+
+Type commands as you would in any terminal. The working directory is not automatically changed when you switch vaults — use `cd` to navigate.
+
+### Collapsing the terminal
+
+Click the **`-`** button in the terminal header to collapse the content area, keeping only the header bar visible. The editor and preview panes expand to fill the reclaimed space. Click **`+`** to expand again.
+
+### Font and theme support
+
+If you use a shell theme such as Oh My Zsh with Powerlevel10k, install a Nerd Font (e.g. **MesloLGS NF**) and configure it as your terminal font to ensure icons and special glyphs render correctly. Tektite looks for Nerd Fonts automatically; the glyph icons appear when a compatible font is installed on your system.
+
+### Resizing the terminal
+
+Drag the thin horizontal divider between the workspace and the terminal header to resize the pane height.
+
+---
+
 ## Keyboard Shortcuts
 
 | Action | Shortcut |
 |---|---|
+| **File** | |
 | Open Vault | `Cmd+O` |
 | New Note | `Cmd+Shift+N` |
+| New Folder | `Cmd+Shift+F` |
 | New Window | `Cmd+N` |
+| Print | `Cmd+P` |
 | Close Tab | `Cmd+W` |
 | Close Window | `Cmd+Shift+W` |
-| Refresh Vault | `Cmd+R` |
+| Open Settings | `Cmd+,` |
+| **Edit** | |
 | Undo | `Cmd+Z` |
 | Redo | `Cmd+Shift+Z` |
-| Open Settings | `Cmd+,` |
+| **View** | |
+| Refresh Vault | `Cmd+R` |
+| **Editor** | |
+| Find in file | `Cmd+F` |
+| Rename selected entry | `Cmd+Shift+R` |
+| Delete selected entry | `Cmd+Backspace` *(file tree focused)* |
+| Toggle bullet list | `Cmd+Shift+8` |
+| **General** | |
 | Dismiss dialogs | `Esc` |

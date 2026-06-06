@@ -50,6 +50,17 @@ contextBridge.exposeInMainWorld("tektite", {
   onTogglePreviewPane: (callback) => ipcRenderer.on("menu:toggle-preview-pane", callback),
   onToggleTagsPane: (callback) => ipcRenderer.on("menu:toggle-tags-pane", callback),
   onToggleGraphPane: (callback) => ipcRenderer.on("menu:toggle-graph-pane", callback),
+  onToggleTerminalPane: (callback) => ipcRenderer.on("menu:toggle-terminal-pane", callback),
+  terminalCreate: (cwd, cols, rows) => ipcRenderer.invoke("terminal:create", cwd, cols, rows),
+  terminalWrite: (pid, data) => ipcRenderer.invoke("terminal:write", pid, data),
+  terminalResize: (pid, cols, rows) => ipcRenderer.invoke("terminal:resize", pid, cols, rows),
+  terminalDestroy: (pid) => ipcRenderer.invoke("terminal:destroy", pid),
+  onTerminalData: (pid, cb) => {
+    const ch = `terminal:data:${pid}`;
+    const fn = (_e, d) => cb(d);
+    ipcRenderer.on(ch, fn);
+    return () => ipcRenderer.removeListener(ch, fn);
+  },
   onOpenSettings: (callback) => ipcRenderer.on("menu:open-settings", callback),
   onGitSyncOutput: (callback) => {
     const listener = (_event, payload) => callback(payload);

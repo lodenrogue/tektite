@@ -98,6 +98,70 @@ button {
   overflow: hidden;
 }
 
+
+.resizer-terminal {
+  height: 6px;
+  border: 0;
+  margin: 0;
+  flex-shrink: 0;
+  background: transparent;
+  cursor: row-resize;
+  user-select: none;
+  touch-action: none;
+  position: relative;
+}
+
+.resizer-terminal::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: transparent;
+  transform: translateY(-50%);
+  transition: background 120ms;
+}
+
+.resizer-terminal:hover::before {
+  background: var(--accent);
+}
+
+.terminal-pane {
+  display: flex;
+  flex-direction: column;
+  height: 260px;
+  min-height: 42px;
+  background: #0d0e11;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.terminal-pane.content-collapsed {
+  height: auto;
+  flex-shrink: 0;
+}
+
+.terminal-pane.content-collapsed .terminal-container {
+  display: none;
+}
+
+.terminal-pane-header {
+  border-top: 1px solid var(--line);
+}
+
+.terminal-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 4px 8px;
+  position: relative;
+}
+
+.terminal-container .xterm {
+  height: 100%;
+}
+
 .sidebar {
   display: grid;
   min-width: 0;
@@ -496,11 +560,20 @@ div.tree-row.active {
 }
 
 .workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.workspace-content {
   display: grid;
+  flex: 1;
   min-width: 0;
   min-height: 0;
   grid-template-columns: minmax(260px, 1fr) 6px minmax(260px, 1fr);
-  height: 100vh;
   overflow: hidden;
 }
 
