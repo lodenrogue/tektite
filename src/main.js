@@ -1034,6 +1034,28 @@ ipcMain.handle("asset:import-image", async (_event, rootPath, sourcePath, target
   };
 });
 
+ipcMain.handle("asset:import-file", async (_event, rootPath, sourcePath, targetFolder = "") => {
+  log("asset:import-file", { sourcePath, targetFolder });
+  const sourceStat = await fs.stat(sourcePath);
+  if (!sourceStat.isFile()) throw new Error("Dropped item is not a file.");
+
+  const extension = path.extname(sourcePath).toLowerCase();
+  const baseName = sanitizeEntryName(path.basename(sourcePath, extension), "file");
+  const baseFolder = normalizeRelative(targetFolder);
+  let candidate = path.posix.join(baseFolder, `${baseName}${extension}`);
+  let index = 2;
+
+  while (await exists(path.join(rootPath, candidate))) {
+    candidate = path.posix.join(baseFolder, `${baseName} ${index}${extension}`);
+    index += 1;
+  }
+
+  const destinationPath = resolveVaultPath(rootPath, candidate);
+  await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+  await fs.copyFile(sourcePath, destinationPath);
+  return candidate;
+});
+
 ipcMain.handle("asset:save-clipboard-image", async (_event, rootPath, targetFolder = "", image = {}) => {
   log("asset:save-clipboard-image", { targetFolder, name: image.name, mimeType: image.mimeType });
   const dataUrl = typeof image.dataUrl === "string" ? image.dataUrl : "";

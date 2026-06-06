@@ -1377,7 +1377,8 @@ function insertMarkdownAtRange(markdown, start, end) {
 function onTreeDragOver(event) {
   if (!state.rootPath) return;
   const hasInternalMove = event.dataTransfer.types.includes("application/x-tektite-entry");
-  if (!hasInternalMove && !hasImageFiles(event.dataTransfer.files)) return;
+  const hasExternalFiles = event.dataTransfer.types.includes("Files");
+  if (!hasInternalMove && !hasExternalFiles) return;
   event.preventDefault();
   event.dataTransfer.dropEffect = hasInternalMove ? "move" : "copy";
 }
@@ -1390,22 +1391,28 @@ async function onTreeDrop(event) {
     return;
   }
 
-  if (!hasImageFiles(event.dataTransfer.files)) return;
+  const files = [...(event.dataTransfer.files || [])];
+  if (!files.length) return;
   event.preventDefault();
   const targetFolderPath = folderFromDropTarget(event.target);
-  const images = droppedImageFiles(event.dataTransfer.files);
+  const imageExts = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"]);
 
   try {
-    for (const file of images) {
+    for (const file of files) {
       const sourcePath = globalThis.tektite.getFilePath(file);
       if (!sourcePath) continue;
-      await globalThis.tektite.importImage(state.rootPath, sourcePath, targetFolderPath);
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      if (imageExts.has(ext)) {
+        await globalThis.tektite.importImage(state.rootPath, sourcePath, targetFolderPath);
+      } else {
+        await globalThis.tektite.importFile(state.rootPath, sourcePath, targetFolderPath);
+      }
     }
     state.collapsedFolders.delete(targetFolderPath);
     await refreshVault();
     setSaveState("Imported");
   } catch (error) {
-    console.error("[tektite:renderer] image drop into tree failed", error);
+    console.error("[tektite:renderer] file drop into tree failed", error);
     setSaveState("Failed");
   }
 }
