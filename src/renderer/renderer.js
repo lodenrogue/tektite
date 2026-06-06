@@ -3050,11 +3050,21 @@ function flushMarkdownCode(context, force = false) {
   context.code = [];
 }
 
+function slugifyHeading(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
 function appendMarkdownHeading(context, heading) {
   flushMarkdownBlocks(context);
   const level = heading[1].length;
-  const content = inlineMarkdown(heading[2], context.sourcePath);
-  context.blocks.push(`<h${level}>${content}</h${level}>`);
+  const rawText = heading[2];
+  const slug = slugifyHeading(rawText);
+  const content = inlineMarkdown(rawText, context.sourcePath);
+  context.blocks.push(`<h${level} id="${escapeAttr(slug)}">${content}</h${level}>`);
 }
 
 function appendMarkdownRule(context) {
@@ -3094,10 +3104,19 @@ function inlineMarkdown(value, sourcePath = "") {
 
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
     const decoded = decodeLink(href);
-    const note = resolveNote(decoded, sourcePath);
     const linkLabel = restore(tokens, label);
+    // Pure anchor: #section
+    if (decoded.startsWith("#")) {
+      return stash(tokens, `<a href="${escapeAttr(decoded)}" class="anchor-link">${linkLabel}</a>`);
+    }
+    // Path with fragment: ./page.md#section — open note then scroll to anchor
+    const fragmentIdx = decoded.indexOf("#");
+    const pathPart = fragmentIdx >= 0 ? decoded.slice(0, fragmentIdx) : decoded;
+    const fragment = fragmentIdx >= 0 ? decoded.slice(fragmentIdx) : "";
+    const note = resolveNote(pathPart || decoded, sourcePath);
     if (note) {
-      return stash(tokens, `<a href="#" data-note-path="${escapeAttr(note.path)}">${linkLabel}</a>`);
+      const data = fragment ? ` data-anchor="${escapeAttr(fragment)}"` : "";
+      return stash(tokens, `<a href="#" data-note-path="${escapeAttr(note.path)}"${data}>${linkLabel}</a>`);
     }
     if (/^https?:\/\//i.test(decoded)) {
       return stash(tokens, `<a href="${escapeAttr(decoded)}" target="_blank" rel="noreferrer">${linkLabel}</a>`);
@@ -3658,20 +3677,44 @@ function onPreviewContextMenu(event) {
 }
 
 function onPreviewClick(event) {
+  // Handle same-page anchor links
+  const anchorLink = event.target.closest("a.anchor-link");
+  if (anchorLink) {
+    event.preventDefault();
+    const hash = anchorLink.getAttribute("href");
+    const target = hash && els.preview.querySelector(hash);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
   const link = event.target.closest("[data-note-path]");
   if (!link) return;
   event.preventDefault();
-  openNoteFromPreviewLink(link.dataset.notePath);
+  const anchor = link.dataset.anchor || "";
+  openNoteFromPreviewLink(link.dataset.notePath, anchor);
 }
 
-function openNoteFromPreviewLink(notePath) {
-  if (!notePath || notePath === state.activePath || !state.noteByPath.has(notePath)) return;
+function scrollPreviewToAnchor(anchor) {
+  if (!anchor) return;
+  requestAnimationFrame(() => {
+    const target = els.preview.querySelector(anchor);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function openNoteFromPreviewLink(notePath, anchor = "") {
+  if (!notePath || !state.noteByPath.has(notePath)) return;
+  if (notePath === state.activePath) {
+    scrollPreviewToAnchor(anchor);
+    return;
+  }
   if (state.activePath && state.activeType === "note") {
     const lastPath = state.previewHistory.at(-1);
     if (lastPath !== state.activePath) state.previewHistory.push(state.activePath);
   }
   state.previewForwardHistory = [];
-  openNote(notePath, { preservePreviewHistory: true });
+  openNote(notePath, { preservePreviewHistory: true }).then(() => {
+    scrollPreviewToAnchor(anchor);
+  });
 }
 
 function goBackPreviewHistory() {
