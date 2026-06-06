@@ -2,7 +2,7 @@
 
 All notable changes to Tektite are documented here.
 
-## [0.1.42] - 2026-06-06
+## [0.1.43] - 2026-06-06
 
 - Drag any file (images and non-images) from Finder into the file tree to copy it into the target folder
 - Internal anchor links now work in preview: `[text](#section)` scrolls to the heading on the current page; `[text](./Note.md#section)` opens the note and scrolls to the heading (fixes [#4](https://github.com/mathiasconradt/tektite/issues/4))
