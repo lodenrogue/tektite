@@ -1821,7 +1821,10 @@ ipcMain.handle("terminal:create", (event, cwd, cols, rows) => {
   const { pid } = ptyProc;
   ptySessions.set(pid, ptyProc);
   ptyProc.onData((data) => { event.sender.send(`terminal:data:${pid}`, data); });
-  ptyProc.onExit(() => { ptySessions.delete(pid); });
+  ptyProc.onExit(() => {
+    event.sender.send("terminal:kill");
+    ptySessions.delete(pid);
+  });
   return pid;
 });
 
