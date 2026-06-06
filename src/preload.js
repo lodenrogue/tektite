@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("tektite", {
     ipcRenderer.invoke("entry:move", rootPath, relativePath, type, targetFolder),
   importImage: (rootPath, sourcePath, targetFolder) =>
     ipcRenderer.invoke("asset:import-image", rootPath, sourcePath, targetFolder),
+  importFile: (rootPath, sourcePath, targetFolder) =>
+    ipcRenderer.invoke("asset:import-file", rootPath, sourcePath, targetFolder),
   saveClipboardImage: (rootPath, targetFolder, image) =>
     ipcRenderer.invoke("asset:save-clipboard-image", rootPath, targetFolder, image),
   readAssetDataUrl: (rootPath, relativePath) =>
