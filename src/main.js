@@ -291,7 +291,7 @@ async function loadWorkspaceStore() {
 async function saveWorkspaceStore(store) {
   cachedStore = store;
   const p = workspaceStatePath();
-  const tmp = `${p}.tmp`;
+  const tmp = `${p}.${process.hrtime.bigint()}.tmp`;
   await fs.mkdir(path.dirname(p), { recursive: true });
   await fs.writeFile(tmp, JSON.stringify(store, null, 2), "utf8");
   await fs.rename(tmp, p);
