@@ -2,6 +2,11 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.56] - 2026-06-07
+
+- Fix: line numbers no longer shown when switching to image file tabs (fixes [#22](https://github.com/mathiasconradt/tektite/issues/22), [#23](https://github.com/mathiasconradt/tektite/pull/23))
+- Fix: line numbers only shown for Markdown notes, not images or other file types
+
 ## [0.1.54] - 2026-06-06
 
 - Fix: line numbers display correctly when no vault or note is open
