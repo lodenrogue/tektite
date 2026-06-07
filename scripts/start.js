@@ -20,7 +20,7 @@ async function main() {
     icon: path.join(root, "assets", "icons", "tektite-icon.icns"),
     overwrite: true,
     out,
-    asar: { unpack: "**/node_modules/node-pty/prebuilds/**" },
+    asar: false,
     ignore: [
       /^\/\.tektite-run(\/|$)/,
       /^\/Tektite-darwin-(arm64|x64)(\/|$)/

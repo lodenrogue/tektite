@@ -1,14 +1,14 @@
 {
   "name": "tektite",
   "productName": "Tektite",
-  "version": "0.1.58",
+  "version": "0.1.59",
   "description": "Tektite is a local-first Markdown knowledge base desktop app.",
   "main": "src/main.js",
   "scripts": {
     "postinstall": "node scripts/copy-vendor.js",
     "start": "node scripts/start.js",
     "dev": "electron .",
-    "package:mac": "electron-packager . Tektite --platform=darwin --icon=assets/icons/tektite-icon.icns --overwrite",
+    "package:mac": "electron-packager . Tektite --platform=darwin --icon=assets/icons/tektite-icon.icns --overwrite --no-asar",
     "package:linux": "electron-packager . Tektite --platform=linux --icon=assets/icons/tektite-icon.png --overwrite"
   },
   "keywords": [

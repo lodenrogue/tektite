@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.59] - 2026-06-07
+
+- Fix: terminal works in packaged/Homebrew app — disable asar to ensure node-pty runs from real filesystem paths (fixes [#24](https://github.com/mathiasconradt/tektite/issues/24))
+
 ## [0.1.57] - 2026-06-07
 
 - Fix: terminal fails to start in Homebrew-installed app — unpack node-pty spawn-helper outside .asar so execute permissions are preserved (fixes [#24](https://github.com/mathiasconradt/tektite/issues/24))
