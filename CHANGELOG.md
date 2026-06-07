@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.57] - 2026-06-07
+
+- Fix: terminal fails to start in Homebrew-installed app — unpack node-pty spawn-helper outside .asar so execute permissions are preserved (fixes [#24](https://github.com/mathiasconradt/tektite/issues/24))
+
 ## [0.1.56] - 2026-06-07
 
 - Fix: line numbers no longer shown when switching to image file tabs (fixes [#22](https://github.com/mathiasconradt/tektite/issues/22), [#23](https://github.com/mathiasconradt/tektite/pull/23))
