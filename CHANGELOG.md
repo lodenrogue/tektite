@@ -2,7 +2,7 @@
 
 All notable changes to Tektite are documented here.
 
-## [0.1.61] - 2026-06-08
+## [0.1.62] - 2026-06-08
 
 - Fix: detect and reload notes changed externally on disk
 - Fix: Intel Mac crash — cannot access terminal instance before initialization
