@@ -1818,13 +1818,33 @@ ipcMain.handle("terminal:create", (event, cwd, cols, rows) => {
   if (!pty) return null;
   const shell = process.env.SHELL || "/bin/sh";
   const safeCwd = cwd && fsSync.existsSync(cwd) ? cwd : app.getPath("home");
-  const ptyProc = pty.spawn(shell, [], {
+  // Diagnostic: print spawn-helper path and executability
+  try {
+    const ptyPath = require.resolve("node-pty");
+    const ptyDir = path.dirname(path.dirname(ptyPath));
+    const helperPath = path.join(ptyDir, "prebuilds", `${process.platform}-${process.arch}`, "spawn-helper");
+    const helperStat = fsSync.statSync(helperPath);
+    console.error("[tektite:terminal] pty module:", ptyPath);
+    console.error("[tektite:terminal] spawn-helper:", helperPath);
+    console.error("[tektite:terminal] spawn-helper mode:", (helperStat.mode & 0o777).toString(8));
+    console.error("[tektite:terminal] spawn-helper exists:", fsSync.existsSync(helperPath));
+  } catch (diagErr) {
+    console.error("[tektite:terminal] diagnostic error:", diagErr.message);
+  }
+  console.error("[tektite:terminal] shell:", shell, "cwd:", safeCwd);
+  let ptyProc;
+  try {
+    ptyProc = pty.spawn(shell, [], {
     name: "xterm-256color",
     cols: cols || 80,
     rows: rows || 24,
     cwd: safeCwd,
     env: { ...process.env, TERM: "xterm-256color" }
   });
+  } catch (err) {
+    console.error("[tektite:terminal] pty.spawn failed:", err);
+    throw err;
+  }
   const { pid } = ptyProc;
   ptySessions.set(pid, ptyProc);
   ptyProc.onData((data) => { event.sender.send(`terminal:data:${pid}`, data); });

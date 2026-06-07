@@ -798,7 +798,14 @@ function initTerminal() {
         const unsub = globalThis.tektite.onTerminalData(pid, (d) => term.write(d));
         termInstance = { term, fit, pid, unsub };
       })
-      .catch(() => { term.write("\r\n\x1b[31mFailed to start terminal.\x1b[0m\r\n"); termInstance = { term, fit, pid: null }; });
+      .catch((err) => {
+        const msg = err?.message || String(err);
+        const stack = err?.stack || "";
+        term.write(`\r\n\x1b[31mFailed to start terminal: ${msg}\x1b[0m\r\n`);
+        if (stack) term.write(`\r\n\x1b[33m${stack}\x1b[0m\r\n`);
+        console.error("[tektite:terminal] spawn error", err);
+        termInstance = { term, fit, pid: null };
+      });
   });
 }
 
