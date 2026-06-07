@@ -193,6 +193,8 @@ const els = {
   currentLineHighlight: document.getElementById("currentLineHighlight")
 };
 
+let termInstance = null;
+
 boot();
 
 function boot() {
@@ -656,7 +658,6 @@ function applyPreviewPaneVisibility() {
 }
 
 // ── Terminal ─────────────────────────────────────────────────────────────────
-let termInstance = null;
 
 function removeLineNumbers() {
   els.lineNumbers.classList.add("hidden");
