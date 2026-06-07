@@ -833,6 +833,29 @@ ipcMain.handle("note:read", async (_event, rootPath, relativePath) => {
   return fs.readFile(filePath, "utf8");
 });
 
+ipcMain.handle("notes:modified-times", async (_event, rootPath, relativePaths = []) => {
+  const paths = Array.isArray(relativePaths) ? relativePaths : [];
+  return Promise.all(paths.map(async (relativePath) => {
+    const filePath = resolveVaultPath(rootPath, relativePath);
+    let stat;
+    try {
+      stat = await fs.stat(filePath);
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        return {
+          path: relativePath,
+          modifiedAt: null
+        };
+      }
+      throw error;
+    }
+    return {
+      path: relativePath,
+      modifiedAt: stat.mtimeMs
+    };
+  }));
+});
+
 ipcMain.handle("note:write", async (_event, rootPath, relativePath, content) => {
   log("note:write", relativePath, `${content.length} chars`);
   const filePath = resolveVaultPath(rootPath, relativePath);
@@ -1861,4 +1884,3 @@ ipcMain.handle("terminal:destroy", (_e, pid) => {
   const p = ptySessions.get(pid);
   if (p) { try { p.kill(); } catch {} ptySessions.delete(pid); }
 });
-

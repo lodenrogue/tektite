@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("tektite", {
   chooseVault: () => ipcRenderer.invoke("vault:choose"),
   scanVault: (rootPath) => ipcRenderer.invoke("vault:scan", rootPath),
   readNote: (rootPath, relativePath) => ipcRenderer.invoke("note:read", rootPath, relativePath),
+  getNoteModifiedTimes: (rootPath, relativePaths) =>
+    ipcRenderer.invoke("notes:modified-times", rootPath, relativePaths),
   writeNote: (rootPath, relativePath, content) =>
     ipcRenderer.invoke("note:write", rootPath, relativePath, content),
   createNote: (rootPath, requestedName, folder, templatePath) =>

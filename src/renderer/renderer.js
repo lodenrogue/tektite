@@ -5,6 +5,9 @@ const state = {
   noteByPath: new Map(),
   noteByTitle: new Map(),
   noteContent: new Map(),
+  noteDiskModifiedAt: new Map(),
+  externalNoteChanges: new Map(),
+  ignoredExternalNoteChanges: new Map(),
   tags: [],
   activePath: null,
   activeType: null,
@@ -81,6 +84,7 @@ const TAGS_MIN_HEIGHT = 56;
 const GRAPH_MIN_HEIGHT = 100;
 const SIDEBAR_PANE_HEADER_HEIGHT = 42;
 const MENTION_ACTION_COUNT = 2;
+const EXTERNAL_NOTE_POLL_MS = 2000;
 
 const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
   localStorage.getItem("tektite:verbose") === "1";
@@ -194,6 +198,7 @@ const els = {
 };
 
 let termInstance = null;
+let externalNoteCheckInFlight = false;
 
 boot();
 
@@ -336,6 +341,17 @@ function boot() {
     fitTerminal();
     if (state.showLineNumbers) renderLineNumbers();
   });
+  globalThis.addEventListener("focus", () => {
+    checkForExternalNoteChanges({ promptActive: true }).catch((error) => {
+      console.warn("[tektite:renderer] external note check failed", error);
+    });
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    checkForExternalNoteChanges({ promptActive: true }).catch((error) => {
+      console.warn("[tektite:renderer] external note check failed", error);
+    });
+  });
   globalThis.addEventListener("beforeunload", saveWorkspaceState);
 
   globalThis.tektite.onOpenVault(chooseVault);
@@ -379,6 +395,12 @@ function boot() {
     destroyTerminal();
     toggleTerminalContent();
   });
+
+  globalThis.setInterval(() => {
+    checkForExternalNoteChanges().catch((error) => {
+      console.warn("[tektite:renderer] external note check failed", error);
+    });
+  }, EXTERNAL_NOTE_POLL_MS);
 }
 
 async function restoreLastVault() {
@@ -1924,24 +1946,9 @@ async function activateTab(relativePath, type, options = {}) {
   els.notePath.textContent = relativePath;
 
   if (type === "note") {
-    const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
-    const content = await globalThis.tektite.readNote(state.rootPath, relativePath);
-
-    state.activeContent = content;
-    state.noteContent.set(relativePath, content);
-    els.editor.disabled = false;
-    els.editor.classList.remove("hidden");
-    els.formattingBar.classList.remove("hidden");
-    els.imageViewer.classList.add("hidden");
-    els.imageViewerImage.removeAttribute("src");
-    els.editor.value = content;
-    els.noteTitle.textContent = state.noteByPath.get(relativePath).title;
-    els.editor.setSelectionRange(Math.min(cursor, content.length), Math.min(cursor, content.length));
-    resetEditorHistory(content, Math.min(cursor, content.length));
-    renderPreview(content);
-    if (options.focusEditor !== false) els.editor.focus();
-    if (state.showLineNumbers) applyLineNumbers();
-    updateCurrentLineHighlight();
+    await checkForExternalNoteChanges({ paths: [relativePath] });
+    const content = await resolveNoteContent(relativePath);
+    applyNoteContent(relativePath, content, options);
   } else {
     removeLineNumbers()
     state.activeContent = "";
@@ -1963,6 +1970,110 @@ async function activateTab(relativePath, type, options = {}) {
   updateGraph();
   setSaveState(type === "note" ? "Saved" : "Read-only");
   saveWorkspaceState();
+}
+
+function applyNoteContent(relativePath, content, options = {}) {
+  const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
+  state.activeContent = content;
+  state.noteContent.set(relativePath, content);
+  els.editor.disabled = false;
+  els.editor.classList.remove("hidden");
+  els.formattingBar.classList.remove("hidden");
+  els.imageViewer.classList.add("hidden");
+  els.imageViewerImage.removeAttribute("src");
+  els.editor.value = content;
+  els.noteTitle.textContent = state.noteByPath.get(relativePath)?.title || relativePath;
+  const nextCursor = Math.min(cursor, content.length);
+  els.editor.setSelectionRange(nextCursor, nextCursor);
+  resetEditorHistory(content, nextCursor);
+  renderPreview(content);
+  if (options.focusEditor !== false) els.editor.focus();
+  if (state.showLineNumbers) applyLineNumbers();
+  updateCurrentLineHighlight();
+}
+
+function openNotePaths() {
+  return [...new Set(
+    state.openTabs
+      .filter((tab) => tab.type === "note")
+      .map((tab) => tab.path)
+      .filter((path) => state.noteByPath.has(path))
+  )];
+}
+
+async function checkForExternalNoteChanges(options = {}) {
+  if (!state.rootPath || externalNoteCheckInFlight) return;
+  const paths = Array.isArray(options.paths) && options.paths.length > 0
+    ? [...new Set(options.paths.filter((path) => typeof path === "string" && state.noteByPath.has(path)))]
+    : openNotePaths();
+  if (paths.length === 0) return;
+
+  externalNoteCheckInFlight = true;
+  try {
+    const updates = await globalThis.tektite.getNoteModifiedTimes(state.rootPath, paths);
+    for (const update of updates) {
+      if (!update || typeof update.path !== "string" || !Number.isFinite(update.modifiedAt)) continue;
+      const knownModifiedAt = state.noteDiskModifiedAt.get(update.path);
+      if (!Number.isFinite(knownModifiedAt)) {
+        state.noteDiskModifiedAt.set(update.path, update.modifiedAt);
+        continue;
+      }
+      if (update.modifiedAt === knownModifiedAt) {
+        state.externalNoteChanges.delete(update.path);
+        state.ignoredExternalNoteChanges.delete(update.path);
+        continue;
+      }
+      if (state.ignoredExternalNoteChanges.get(update.path) === update.modifiedAt) continue;
+      state.externalNoteChanges.set(update.path, update.modifiedAt);
+    }
+  } finally {
+    externalNoteCheckInFlight = false;
+  }
+
+  if (options.promptActive && state.activeType === "note" && state.activePath) {
+    const reloadedContent = await maybeReloadNoteFromExternalChange(state.activePath, { preserveCursor: true });
+    if (typeof reloadedContent === "string") {
+      applyNoteContent(state.activePath, reloadedContent, { preserveCursor: true });
+      setSaveState("Saved");
+    }
+  }
+}
+
+async function resolveNoteContent(relativePath) {
+  const reloadedContent = await maybeReloadNoteFromExternalChange(relativePath);
+  if (typeof reloadedContent === "string") {
+    return reloadedContent;
+  }
+  const ignoredModifiedAt = state.ignoredExternalNoteChanges.get(relativePath);
+  if (Number.isFinite(ignoredModifiedAt) && state.noteContent.has(relativePath)) {
+    return state.noteContent.get(relativePath);
+  }
+  const content = await globalThis.tektite.readNote(state.rootPath, relativePath);
+  state.noteContent.set(relativePath, content);
+  const knownModifiedAt = state.externalNoteChanges.get(relativePath) ??
+    state.noteByPath.get(relativePath)?.modifiedAt;
+  if (Number.isFinite(knownModifiedAt)) {
+    state.noteDiskModifiedAt.set(relativePath, knownModifiedAt);
+  }
+  return content;
+}
+
+async function maybeReloadNoteFromExternalChange(relativePath) {
+  const modifiedAt = state.externalNoteChanges.get(relativePath);
+  if (!Number.isFinite(modifiedAt)) return null;
+
+  const message = "This file changed outside Tektite.\n\nLoad changes from disk?";
+
+  if (globalThis.confirm(message)) {
+    state.externalNoteChanges.delete(relativePath);
+    state.ignoredExternalNoteChanges.delete(relativePath);
+    state.noteDiskModifiedAt.set(relativePath, modifiedAt);
+    return globalThis.tektite.readNote(state.rootPath, relativePath);
+  }
+
+  state.externalNoteChanges.delete(relativePath);
+  state.ignoredExternalNoteChanges.set(relativePath, modifiedAt);
+  return null;
 }
 
 function ensureOpenTab(path, type) {
@@ -2485,8 +2596,13 @@ async function saveActiveNote() {
     return;
   }
   setSaveState("Saving...");
-  await globalThis.tektite.writeNote(state.rootPath, state.activePath, state.activeContent);
+  const savedNote = await globalThis.tektite.writeNote(state.rootPath, state.activePath, state.activeContent);
   state.noteContent.set(state.activePath, state.activeContent);
+  if (Number.isFinite(savedNote?.modifiedAt)) {
+    state.noteDiskModifiedAt.set(state.activePath, savedNote.modifiedAt);
+  }
+  state.externalNoteChanges.delete(state.activePath);
+  state.ignoredExternalNoteChanges.delete(state.activePath);
   setSaveState("Saved");
   const vault = await globalThis.tektite.scanVault(state.rootPath);
   if (!vault.ok) {
@@ -2508,6 +2624,9 @@ function showEmptyState(message = "Choose a local folder to start.") {
   state.activeType = null;
   state.activeContent = "";
   state.openTabs = [];
+  state.noteDiskModifiedAt.clear();
+  state.externalNoteChanges.clear();
+  state.ignoredExternalNoteChanges.clear();
   state.previewHistory = [];
   state.previewForwardHistory = [];
   state.hasGitRepo = false;
@@ -2732,6 +2851,7 @@ function indexNotes() {
 async function loadGraphContent() {
   log("loadGraphContent start", state.notes.length);
   const nextContent = new Map();
+  const nextModifiedAt = new Map();
   await Promise.all(
     state.notes.map(async (note) => {
       try {
@@ -2739,9 +2859,13 @@ async function loadGraphContent() {
       } catch {
         nextContent.set(note.path, "");
       }
+      if (Number.isFinite(note.modifiedAt)) nextModifiedAt.set(note.path, note.modifiedAt);
     })
   );
   state.noteContent = nextContent;
+  state.noteDiskModifiedAt = nextModifiedAt;
+  state.externalNoteChanges.clear();
+  state.ignoredExternalNoteChanges.clear();
   log("loadGraphContent complete");
 }
 
