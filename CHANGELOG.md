@@ -2,6 +2,13 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.62] - 2026-06-08
+
+- Fix: detect and reload notes changed externally on disk
+- Fix: Intel Mac crash — cannot access terminal instance before initialization
+- Fix: SonarQube code quality improvements (empty catch clauses, void operator, cognitive complexity)
+- Remove debug terminal logging from production build
+
 ## [0.1.59] - 2026-06-07
 
 - Fix: terminal works in packaged/Homebrew app — disable asar to ensure node-pty runs from real filesystem paths (fixes [#24](https://github.com/mathiasconradt/tektite/issues/24))

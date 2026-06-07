@@ -86,9 +86,7 @@ const SIDEBAR_PANE_HEADER_HEIGHT = 42;
 const MENTION_ACTION_COUNT = 2;
 const EXTERNAL_NOTE_POLL_MS = 2000;
 
-function log(...args) {
-  void args;
-}
+function log() { /* verbose logging disabled */ }
 
 const els = {
   vaultName: document.getElementById("vaultName"),
@@ -1092,7 +1090,7 @@ async function createNote(context = currentSelection()) {
     await refreshVault();
     await openNote(newPath);
     log("createNote complete", newPath);
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1118,7 +1116,7 @@ async function createFolder(context = currentSelection()) {
     selectEntry(newPath, "folder");
     els.fileTree.focus();
     log("createFolder complete", newPath);
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1145,7 +1143,7 @@ async function deleteSelectedEntry(context = currentSelection()) {
     await refreshVault();
     setSaveState("Deleted");
     els.fileTree.focus();
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1465,7 +1463,7 @@ async function createMentionNode() {
     clearTimeout(state.saveTimer);
     await saveActiveNote();
     await openNote(newPath);
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1493,7 +1491,7 @@ async function onEditorPaste(event) {
     await refreshVault({ flush: false });
     insertImportedImages(imported);
     await saveActiveNote();
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1559,7 +1557,7 @@ async function onEditorDrop(event) {
     await refreshVault({ flush: false });
     insertImportedImages(imported, event);
     await saveActiveNote();
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1648,7 +1646,7 @@ async function onTreeDrop(event) {
     state.collapsedFolders.delete(targetFolderPath);
     await refreshVault();
     setSaveState("Imported");
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1674,7 +1672,7 @@ async function moveTreeEntry(payload, targetFolderPath) {
     await refreshVault();
     await reopenMovedTreeEntry(payload, nextPath);
     setSaveState("Moved");
-  } catch (error) {
+  } catch {
     setSaveState("Failed");
   }
 }
@@ -1980,6 +1978,15 @@ function openNotePaths() {
   )];
 }
 
+function applyExternalNoteUpdate(update) {
+  if (!update || typeof update.path !== "string" || !Number.isFinite(update.modifiedAt)) return;
+  const knownModifiedAt = state.noteDiskModifiedAt.get(update.path);
+  if (!Number.isFinite(knownModifiedAt)) { state.noteDiskModifiedAt.set(update.path, update.modifiedAt); return; }
+  if (update.modifiedAt === knownModifiedAt) { state.externalNoteChanges.delete(update.path); state.ignoredExternalNoteChanges.delete(update.path); return; }
+  if (state.ignoredExternalNoteChanges.get(update.path) === update.modifiedAt) return;
+  state.externalNoteChanges.set(update.path, update.modifiedAt);
+}
+
 async function checkForExternalNoteChanges(options = {}) {
   if (!state.rootPath || externalNoteCheckInFlight) return;
   const paths = Array.isArray(options.paths) && options.paths.length > 0
@@ -1990,27 +1997,13 @@ async function checkForExternalNoteChanges(options = {}) {
   externalNoteCheckInFlight = true;
   try {
     const updates = await globalThis.tektite.getNoteModifiedTimes(state.rootPath, paths);
-    for (const update of updates) {
-      if (!update || typeof update.path !== "string" || !Number.isFinite(update.modifiedAt)) continue;
-      const knownModifiedAt = state.noteDiskModifiedAt.get(update.path);
-      if (!Number.isFinite(knownModifiedAt)) {
-        state.noteDiskModifiedAt.set(update.path, update.modifiedAt);
-        continue;
-      }
-      if (update.modifiedAt === knownModifiedAt) {
-        state.externalNoteChanges.delete(update.path);
-        state.ignoredExternalNoteChanges.delete(update.path);
-        continue;
-      }
-      if (state.ignoredExternalNoteChanges.get(update.path) === update.modifiedAt) continue;
-      state.externalNoteChanges.set(update.path, update.modifiedAt);
-    }
+    for (const update of updates) applyExternalNoteUpdate(update);
   } finally {
     externalNoteCheckInFlight = false;
   }
 
   if (options.promptActive && state.activeType === "note" && state.activePath) {
-    const reloadedContent = await maybeReloadNoteFromExternalChange(state.activePath, { preserveCursor: true });
+    const reloadedContent = await maybeReloadNoteFromExternalChange(state.activePath);
     if (typeof reloadedContent === "string") {
       applyNoteContent(state.activePath, reloadedContent, { preserveCursor: true });
       setSaveState("Saved");

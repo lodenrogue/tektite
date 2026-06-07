@@ -32,9 +32,7 @@ const recentVaultLimit = 10;
 app.name = "Tektite";
 app.setName("Tektite");
 
-function log(...args) {
-  void args;
-}
+function log() { /* verbose logging disabled */ }
 
 function createWindow(options = {}) {
   const shouldShowImmediately = options.show !== false;
@@ -1840,18 +1838,13 @@ ipcMain.handle("terminal:create", (event, cwd, cols, rows) => {
   if (!pty) return null;
   const shell = process.env.SHELL || "/bin/sh";
   const safeCwd = cwd && fsSync.existsSync(cwd) ? cwd : app.getPath("home");
-  let ptyProc;
-  try {
-    ptyProc = pty.spawn(shell, [], {
+  const ptyProc = pty.spawn(shell, [], {
     name: "xterm-256color",
     cols: cols || 80,
     rows: rows || 24,
-     cwd: safeCwd,
-     env: { ...process.env, TERM: "xterm-256color" }
-   });
-  } catch (err) {
-    throw err;
-  }
+    cwd: safeCwd,
+    env: { ...process.env, TERM: "xterm-256color" }
+  });
   const { pid } = ptyProc;
   ptySessions.set(pid, ptyProc);
   ptyProc.onData((data) => { event.sender.send(`terminal:data:${pid}`, data); });
