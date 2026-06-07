@@ -1925,9 +1925,7 @@ async function activateTab(relativePath, type, options = {}) {
 
   if (type === "note") {
     const cursor = options.preserveCursor ? els.editor.selectionStart : 0;
-    const content = state.noteContent.has(relativePath)
-      ? state.noteContent.get(relativePath)
-      : await globalThis.tektite.readNote(state.rootPath, relativePath);
+    const content = await globalThis.tektite.readNote(state.rootPath, relativePath);
 
     state.activeContent = content;
     state.noteContent.set(relativePath, content);
@@ -2060,10 +2058,19 @@ async function closeAllEditorTabs() {
   showEmptyState("Select or create a note.");
 }
 
+function isActiveNoteDirty() {
+  if (state.activeType !== "note" || !state.activePath) return false;
+  return els.editor.value !== (state.noteContent.get(state.activePath) || "");
+}
+
 async function flushActiveNote() {
   if (state.activeType !== "note" || !state.activePath) return;
+  if (!isActiveNoteDirty()) {
+    clearTimeout(state.saveTimer);
+    state.activeContent = els.editor.value;
+    return;
+  }
   state.activeContent = els.editor.value;
-  state.noteContent.set(state.activePath, state.activeContent);
   clearTimeout(state.saveTimer);
   await saveActiveNote();
 }
@@ -2084,7 +2091,6 @@ function onEditorInput() {
   if (state.activeType !== "note") return;
   if (state.editorHistory.restoring) return;
   state.activeContent = els.editor.value;
-  if (state.activePath) state.noteContent.set(state.activePath, state.activeContent);
   renderPreview(state.activeContent);
   updateMentionMenu();
   recordEditorHistory();
@@ -2474,6 +2480,10 @@ function onMentionMenuKeydown(event) {
 async function saveActiveNote() {
   if (!state.rootPath || state.activeType !== "note" || !state.activePath) return;
   state.activeContent = els.editor.value;
+  if (!isActiveNoteDirty()) {
+    setSaveState("Saved");
+    return;
+  }
   setSaveState("Saving...");
   await globalThis.tektite.writeNote(state.rootPath, state.activePath, state.activeContent);
   state.noteContent.set(state.activePath, state.activeContent);
@@ -3191,7 +3201,6 @@ async function printCurrentPreview() {
 
   if (state.activeType === "note") {
     state.activeContent = els.editor.value;
-    if (state.activePath) state.noteContent.set(state.activePath, state.activeContent);
     renderPreview(state.activeContent);
   }
 
