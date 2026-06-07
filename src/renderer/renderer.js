@@ -658,10 +658,15 @@ function applyPreviewPaneVisibility() {
 // ── Terminal ─────────────────────────────────────────────────────────────────
 let termInstance = null;
 
+function removeLineNumbers() {
+  els.lineNumbers.classList.add("hidden");
+}
+
 function toggleLineNumbers() {
   state.showLineNumbers = !state.showLineNumbers;
   localStorage.setItem("tektite:showLineNumbers", state.showLineNumbers ? "1" : "0");
-  applyLineNumbers();
+
+  if(state.activePath.endsWith(".md")) applyLineNumbers();
   syncPaneStateToMenu();
 }
 
@@ -673,7 +678,7 @@ function applyLineNumbers() {
     els.lineNumbers.classList.remove("hidden");
     renderLineNumbers();
   } else {
-    els.lineNumbers.classList.add("hidden");
+    removeLineNumbers();
   }
 }
 
@@ -1929,9 +1934,10 @@ async function activateTab(relativePath, type, options = {}) {
     resetEditorHistory(content, Math.min(cursor, content.length));
     renderPreview(content);
     if (options.focusEditor !== false) els.editor.focus();
-    if (state.showLineNumbers) renderLineNumbers();
+    if (state.showLineNumbers) applyLineNumbers();
     updateCurrentLineHighlight();
   } else {
+    removeLineNumbers()
     state.activeContent = "";
     els.editor.disabled = true;
     els.editor.classList.add("hidden");
