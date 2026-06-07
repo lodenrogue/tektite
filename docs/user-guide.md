@@ -6,19 +6,45 @@ Tektite is a lightweight Markdown knowledge base for macOS and Linux. It works e
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started)
-2. [Vaults](#vaults)
-3. [File Tree](#file-tree)
-4. [Editor](#editor)
-5. [Preview](#preview)
-6. [Tags Pane](#tags-pane)
-7. [Graph Pane](#graph-pane)
-8. [Git Sync](#git-sync)
-9. [Templates](#templates)
-10. [Settings](#settings)
-11. [Terminal](#terminal)
-12. [Layout & Appearance](#layout--appearance)
-13. [Keyboard Shortcuts](#keyboard-shortcuts)
+1. [Installation](#installation)
+2. [Getting Started](#getting-started)
+3. [Vaults](#vaults)
+4. [File Tree](#file-tree)
+5. [Editor](#editor)
+6. [Preview](#preview)
+7. [Tags Pane](#tags-pane)
+8. [Graph Pane](#graph-pane)
+9. [Git Sync](#git-sync)
+10. [Templates](#templates)
+11. [Settings](#settings)
+12. [Terminal](#terminal)
+13. [Layout & Appearance](#layout--appearance)
+14. [Keyboard Shortcuts](#keyboard-shortcuts)
+
+---
+
+## Installation
+
+### Homebrew (recommended)
+
+```sh
+brew tap mathiasconradt/tektite https://github.com/mathiasconradt/tektite
+brew install --cask tektite
+```
+
+Homebrew installs the matching build for Apple Silicon or Intel Macs and automatically removes the macOS quarantine attribute.
+
+### Direct download
+
+Download the zip for your architecture from [GitHub Releases](https://github.com/mathiasconradt/tektite/releases), extract it, and move `Tektite.app` to `/Applications`.
+
+**macOS "damaged" warning:** If macOS says the app is damaged and can't be opened, this is caused by the quarantine attribute macOS adds to files downloaded via a browser. Run the following command in Terminal, then try opening the app again:
+
+```sh
+xattr -cr "/Applications/Tektite.app"
+```
+
+This is a known macOS Gatekeeper restriction for apps that are not notarized with an Apple Developer certificate. It does not indicate any actual problem with the app.
 
 ---
 
