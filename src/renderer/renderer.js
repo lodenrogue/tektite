@@ -86,11 +86,8 @@ const SIDEBAR_PANE_HEADER_HEIGHT = 42;
 const MENTION_ACTION_COUNT = 2;
 const EXTERNAL_NOTE_POLL_MS = 2000;
 
-const verbose = new URLSearchParams(globalThis.location.search).has("debug") ||
-  localStorage.getItem("tektite:verbose") === "1";
-
 function log(...args) {
-  if (verbose) console.log("[tektite:renderer]", ...args);
+  void args;
 }
 
 const els = {
@@ -342,15 +339,11 @@ function boot() {
     if (state.showLineNumbers) renderLineNumbers();
   });
   globalThis.addEventListener("focus", () => {
-    checkForExternalNoteChanges({ promptActive: true }).catch((error) => {
-      console.warn("[tektite:renderer] external note check failed", error);
-    });
+    checkForExternalNoteChanges({ promptActive: true }).catch(() => {});
   });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
-    checkForExternalNoteChanges({ promptActive: true }).catch((error) => {
-      console.warn("[tektite:renderer] external note check failed", error);
-    });
+    checkForExternalNoteChanges({ promptActive: true }).catch(() => {});
   });
   globalThis.addEventListener("beforeunload", saveWorkspaceState);
 
@@ -397,9 +390,7 @@ function boot() {
   });
 
   globalThis.setInterval(() => {
-    checkForExternalNoteChanges().catch((error) => {
-      console.warn("[tektite:renderer] external note check failed", error);
-    });
+    checkForExternalNoteChanges().catch(() => {});
   }, EXTERNAL_NOTE_POLL_MS);
 }
 
@@ -826,7 +817,6 @@ function initTerminal() {
         const stack = err?.stack || "";
         term.write(`\r\n\x1b[31mFailed to start terminal: ${msg}\x1b[0m\r\n`);
         if (stack) term.write(`\r\n\x1b[33m${stack}\x1b[0m\r\n`);
-        console.error("[tektite:terminal] spawn error", err);
         termInstance = { term, fit, pid: null };
       });
   });
@@ -976,7 +966,6 @@ async function syncGitVault() {
     await refreshVault({ flush: false });
     setSaveState(result.ok ? "Synced" : "Git sync failed");
   } catch (error) {
-    console.error("[tektite:renderer] syncGitVault failed", error);
     setSaveState("Git sync failed");
     appendGitOutput(`${error.message || "Git sync failed."}\n`);
   } finally {
@@ -1038,7 +1027,6 @@ async function openVault(rootPath) {
     setSaveState("Idle");
     log("openVault complete");
   } catch (error) {
-    console.error("[tektite:renderer] openVault failed", error);
     showEmptyState(error.message || "Could not open vault.");
     setSaveState("Failed");
   }
@@ -1105,7 +1093,6 @@ async function createNote(context = currentSelection()) {
     await openNote(newPath);
     log("createNote complete", newPath);
   } catch (error) {
-    console.error("[tektite:renderer] createNote failed", error);
     setSaveState("Failed");
   }
 }
@@ -1132,7 +1119,6 @@ async function createFolder(context = currentSelection()) {
     els.fileTree.focus();
     log("createFolder complete", newPath);
   } catch (error) {
-    console.error("[tektite:renderer] createFolder failed", error);
     setSaveState("Failed");
   }
 }
@@ -1160,7 +1146,6 @@ async function deleteSelectedEntry(context = currentSelection()) {
     setSaveState("Deleted");
     els.fileTree.focus();
   } catch (error) {
-    console.error("[tektite:renderer] deleteSelectedEntry failed", error);
     setSaveState("Failed");
   }
 }
@@ -1188,7 +1173,6 @@ async function renameSelectedEntry(context = currentSelection()) {
     await reopenRenamedEntry(context, previousActivePath, newPath);
     setSaveState("Renamed");
   } catch (error) {
-    console.error("[tektite:renderer] renameSelectedEntry failed", error);
     setSaveState("Failed");
     const msg = error.message || "";
     const friendlyError = msg.includes("already exists")
@@ -1482,7 +1466,6 @@ async function createMentionNode() {
     await saveActiveNote();
     await openNote(newPath);
   } catch (error) {
-    console.error("[tektite:renderer] createMentionNode failed", error);
     setSaveState("Failed");
   }
 }
@@ -1511,7 +1494,6 @@ async function onEditorPaste(event) {
     insertImportedImages(imported);
     await saveActiveNote();
   } catch (error) {
-    console.error("[tektite:renderer] image paste into editor failed", error);
     setSaveState("Failed");
   }
 }
@@ -1578,7 +1560,6 @@ async function onEditorDrop(event) {
     insertImportedImages(imported, event);
     await saveActiveNote();
   } catch (error) {
-    console.error("[tektite:renderer] image drop into editor failed", error);
     setSaveState("Failed");
   }
 }
@@ -1668,7 +1649,6 @@ async function onTreeDrop(event) {
     await refreshVault();
     setSaveState("Imported");
   } catch (error) {
-    console.error("[tektite:renderer] file drop into tree failed", error);
     setSaveState("Failed");
   }
 }
@@ -1695,7 +1675,6 @@ async function moveTreeEntry(payload, targetFolderPath) {
     await reopenMovedTreeEntry(payload, nextPath);
     setSaveState("Moved");
   } catch (error) {
-    console.error("[tektite:renderer] moveTreeEntry failed", error);
     setSaveState("Failed");
   }
 }
@@ -2781,9 +2760,7 @@ async function loadWorkspaceState() {
   try {
     const persisted = await globalThis.tektite.loadWorkspaceState(state.rootPath);
     if (persisted?.workspace && typeof persisted.workspace === "object") return persisted.workspace;
-  } catch (error) {
-    console.warn("[tektite:renderer] workspace state load failed", error);
-  }
+  } catch {}
 
   try {
     const workspace = JSON.parse(localStorage.getItem(workspaceStorageKey()) || "null");
@@ -2825,9 +2802,7 @@ function saveWorkspaceState() {
   };
 
   localStorage.setItem(workspaceStorageKey(), JSON.stringify(workspace));
-  globalThis.tektite.saveWorkspaceState(state.rootPath, workspace).catch((error) => {
-    console.warn("[tektite:renderer] workspace state save failed", error);
-  });
+  globalThis.tektite.saveWorkspaceState(state.rootPath, workspace).catch(() => {});
 }
 
 function workspaceStorageKey() {
@@ -3336,14 +3311,12 @@ async function printCurrentPreview() {
     });
 
     if (result?.ok === false && result.error && !/cancel/i.test(result.error)) {
-      console.error("[tektite:renderer] print failed", result.error);
       const msg = /no printer/i.test(result.error)
         ? "No printers configured. Please add a printer in System Settings and try again."
         : `Could not print: ${result.error}`;
       globalThis.alert(msg);
     }
-  } catch (error) {
-    console.error("[tektite:renderer] print failed", error);
+  } catch {
     globalThis.alert("Could not print. Please try again.");
   }
 }
