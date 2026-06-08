@@ -727,17 +727,58 @@ function updateCurrentLineHighlight() {
     els.currentLineHighlight.style.opacity = "0";
     return;
   }
+
   const style = getComputedStyle(els.editor);
+
   const fontSize = Number.parseFloat(style.fontSize) || 15;
-  const lineHeight = fontSize * 1.65;
-  const paddingTop = Number.parseFloat(style.paddingTop) || 26;
+
+  let lineHeight = Number.parseFloat(style.lineHeight);
+  if (Number.isNaN(lineHeight)) {
+    lineHeight = fontSize * 1.65;
+  }
+
+  const mirror = document.createElement("div");
+  mirror.style.cssText = `
+    position: absolute;
+    visibility: hidden;
+    left: -9999px;
+    top: 0;
+    box-sizing: border-box;
+    width: ${els.editor.offsetWidth}px;
+    font: ${style.font};
+    line-height: ${style.lineHeight};
+    padding: ${style.padding};
+    border: ${style.border};
+    letter-spacing: ${style.letterSpacing};
+    tab-size: ${style.tabSize};
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    overflow: hidden;
+  `;
+
   const cursor = els.editor.selectionStart;
-  const lineIdx = els.editor.value.slice(0, cursor).split("\n").length - 1;
-  const top = paddingTop + lineIdx * lineHeight - els.editor.scrollTop;
-  if (top < 0 || top > els.editor.clientHeight + lineHeight) {
+  const before = els.editor.value.slice(0, cursor);
+  const after = els.editor.value.slice(cursor);
+
+  mirror.appendChild(document.createTextNode(before));
+
+  const marker = document.createElement("span");
+  marker.textContent = "|";
+  mirror.appendChild(marker);
+
+  mirror.appendChild(document.createTextNode(after));
+
+  document.body.appendChild(mirror);
+
+  const top = marker.offsetTop - els.editor.scrollTop;
+
+  document.body.removeChild(mirror);
+
+  if (top < -lineHeight || top > els.editor.clientHeight) {
     els.currentLineHighlight.style.opacity = "0";
     return;
   }
+
   els.currentLineHighlight.style.top = `${top}px`;
   els.currentLineHighlight.style.height = `${lineHeight}px`;
   els.currentLineHighlight.style.opacity = "1";
