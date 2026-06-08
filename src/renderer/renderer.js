@@ -767,12 +767,11 @@ function updateCurrentLineHighlight() {
   mirror.appendChild(marker);
 
   mirror.appendChild(document.createTextNode(after));
-
   document.body.appendChild(mirror);
 
   const top = marker.offsetTop - els.editor.scrollTop;
 
-  document.body.removeChild(mirror);
+  mirror.remove();
 
   if (top < -lineHeight || top > els.editor.clientHeight) {
     els.currentLineHighlight.style.opacity = "0";
