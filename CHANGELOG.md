@@ -2,6 +2,10 @@
 
 All notable changes to Tektite are documented here.
 
+## [0.1.63] - 2026-06-09
+
+- Fix: line highlighting no longer drifts while editing or scrolling (fixes [#33](https://github.com/mathiasconradt/tektite/issues/33))
+
 ## [0.1.62] - 2026-06-08
 
 - Fix: detect and reload notes changed externally on disk
